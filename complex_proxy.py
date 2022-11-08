@@ -25,16 +25,18 @@ def FunctionSpace(V):
             W_components.append(fd.VectorElement(elem, dim=2))
 
         elif rank == 1:  # vector basis coefficients
+            assert isinstance(elem, fd.VectorElement)
             dim = elem.num_sub_elements()
             shape = (2, dim)
             scalar_element = elem.sub_elements()[0]
-            W_components.append(fd.TensorElement(scalar_element, shape))
+            W_components.append(fd.TensorElement(scalar_element, shape=shape))
 
         else:
+            assert isinstance(elem, fd.TensorElement)
             assert (rank > 0)
             shape = (2,) + elem._shape
             scalar_element = elem.sub_elements()[0]
-            W_components.append(fd.TensorElement(scalar_element, shape))
+            W_components.append(fd.TensorElement(scalar_element, shape=shape))
 
     return fold((fd.FunctionSpace(V.mesh(), w)
                  for w in W_components))
