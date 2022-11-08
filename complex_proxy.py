@@ -40,11 +40,12 @@ def FunctionSpace(V):
                  for w in W_components))
 
 
-def DirichletBC(W, bc):
+def DirichletBC(W, V, bc):
     """
-    Return a DirichletBC on the complex FunctionSpace W that is equivalent to the DirichletBC bc on the real FunctionSpace that W was constructed from.
+    Return a DirichletBC on the complex FunctionSpace W that is equivalent to the DirichletBC bc on the real FunctionSpace V that W was constructed from.
 
     :arg W: the complex FunctionSpace.
+    :arg V: the real FunctionSpace that W was constructed from.
     :arg bc: a DirichletBC on the real FunctionSpace that W was constructed from.
     """
     pass
@@ -74,7 +75,7 @@ def get_real(u, vout=None, name=None):
 
     :arg u: a complex Function.
     :arg vout: If a real Function then real component of u is placed here. If None then a new Function is returned.
-    :arg name: If vout is None, the name of the new Function. Ignored if uout is not none.
+    :arg name: If vout is None, the name of the new Function. Ignored if vout is not none.
     """
     pass
 
@@ -131,10 +132,10 @@ def _set_components(u, vnew, i):
     pass
 
 
-def LinearForm(z, A):
+def BilinearForm(z, A):
     """
-    Return a linear Form on the complex FunctionSpace equal to a complex multiple of a linear Form on the real FunctionSpace.
-    If z = zr + i*zi, u = ur + i*ui, and b = br + i*bi, we want to construct a Form such that (zA)u=b
+    Return a bilinear Form on the complex FunctionSpace equal to a complex multiple of a bilinear Form on the real FunctionSpace.
+    If z = zr + i*zi is a complex number, u = ur + i*ui is a complex Function, and b = br + i*bi is a complex linear Form, we want to construct a Form such that (zA)u=b
 
     (zA)u = (zr*A + i*zi*A)(ur + i*ui)
           = (zr*A*ur - zi*A*ui) + i*(zr*A*ui + zi*A*ur)
@@ -144,15 +145,27 @@ def LinearForm(z, A):
             | zi*A    zr*A | | ui | = | bi |
 
     :arg z: a complex number.
-    :arg A: a generator function for a linear Form on the real FunctionSpace, callable as A(*u, *v) where u and v are TrialFunctions and TestFunctions on the real FunctionSpace.
+    :arg A: a generator function for a bilinear Form on the real FunctionSpace, callable as A(*u, *v) where u and v are TrialFunctions and TestFunctions on the real FunctionSpace.
     """
     pass
 
 
-def NonLinearForm(z, F):
+def LinearForm(z, f):
     """
-    TODO: Is this valid for anything higher than quadratic nonlinearities?
+    Return a Linear Form on the complex FunctionSpace equal to a complex multiple of a linear Form on the real FunctionSpace.
+    If z = zr + i*zi is a complex number, v = vr + i*vi is a complex TestFunction, we want to construct a Form <v,zf>
 
+    <v,zf> = <(vr + i*vi),(zr + i*zi)f>
+           = <(zr*vr - zi*vi),f> + i<(zr*vi + zi*vr),f>
+
+    :arg z: a complex number.
+    :arg f: a generator function for a linear Form on the real FunctionSpace, callable as f(*v) where v are TestFunctions on the real FunctionSpace.
+    """
+    pass
+
+
+def NonlinearForm(z, F):
+    """
     Return a nonlinear Form on the complex FunctionSpace equal to a complex multiple of a nonlinear Form on the real FunctionSpace
 
     If z = zr + i*zi and u = ur + i*ui, we want to construct a Form z*F(u)
@@ -163,7 +176,7 @@ def NonLinearForm(z, F):
     :arg z: a complex number.
     :arg F: a generator function for a nonlinear Form on the real FunctionSpace, callable as F(*u, *v) where u and v are Functions and TestFunctions on the real FunctionSpace.
     """
-    pass
+    raise NotImplementedError("TODO: Is NonlinearForm valid for anything higher than quadratic nonlinearities?")
 
 
 def derivative(z, F, u):
