@@ -1,6 +1,9 @@
 
 import firedrake as fd
 
+from ufl.classes import MultiIndex, FixedIndex, Indexed
+
+
 
 def FunctionSpace(V):
     """
@@ -51,6 +54,31 @@ def DirichletBC(W, V, bc):
     :arg bc: a DirichletBC on the real FunctionSpace that W was constructed from.
     """
     pass
+
+
+def split(u, i):
+    """
+    If u is a Coefficient or Argument in the complex FunctionSpace, returns a tuple with the function components corresponding to the real or imaginary subelements, indexed appropriately.
+
+    :arg u: a Coefficient or Argument in the complex FunctionSpace
+    :arg i: 0 for real subelements, 1 for imaginary elements
+    """
+    if (i!=0) and (i!=1):
+        raise ValueError("i must be 0 for real subelements or 1 for imaginary subelements")
+
+    us = fd.split(u)
+
+    ncomponents = len(us)
+
+    if ncomponents == 1:
+        return us[i]
+
+    def get_sub_element(cpt, i):
+        part = us[cpt]
+        idxs = fd.indices(len(part.ufl_shape) - 1)
+        return fd.as_tensor(Indexed(part, MultiIndex((FixedIndex(i), *idxs))), idxs)
+
+    return tuple(get_sub_element(cpt, i) for cpt in range(ncomponents))
 
 
 def real_components(u):
