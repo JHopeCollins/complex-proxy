@@ -1,5 +1,5 @@
 
-# import firedrake as fd
+import firedrake as fd
 
 
 def FunctionSpace(V):
@@ -12,7 +12,32 @@ def FunctionSpace(V):
 
     :arg V: the real-valued function space.
     """
-    pass
+    from functools import reduce, partial
+    from operator import mul
+    fold = partial(reduce, mul)
+
+    W_components = []
+    for V_component in V.split():
+        rank = V_component.rank
+        elem = V_component.ufl_element()
+
+        if rank == 0:  # scalar basis coefficients
+            W_components.append(fd.VectorElement(elem, dim=2))
+
+        elif rank == 1:  # vector basis coefficients
+            dim = elem.num_sub_elements()
+            shape = (2, dim)
+            scalar_element = elem.sub_elements()[0]
+            W_components.append(fd.TensorElement(scalar_element, shape))
+
+        else:
+            assert (rank > 0)
+            shape = (2,) + elem._shape
+            scalar_element = elem.sub_elements()[0]
+            W_components.append(fd.TensorElement(scalar_element, shape))
+
+    return fold((fd.FunctionSpace(V.mesh(), w)
+                 for w in W_components))
 
 
 def DirichletBC(W, bc):
@@ -121,6 +146,7 @@ def LinearForm(z, A):
     :arg z: a complex number.
     :arg A: a generator function for a linear Form on the real FunctionSpace, callable as A(*u, *v) where u and v are TrialFunctions and TestFunctions on the real FunctionSpace.
     """
+    pass
 
 
 def NonLinearForm(z, F):
@@ -137,6 +163,7 @@ def NonLinearForm(z, F):
     :arg z: a complex number.
     :arg F: a generator function for a nonlinear Form on the real FunctionSpace, callable as F(*u, *v) where u and v are Functions and TestFunctions on the real FunctionSpace.
     """
+    pass
 
 
 def derivative(z, F, u):
@@ -147,3 +174,4 @@ def derivative(z, F, u):
     :arg F: a generator function for a nonlinear Form on the real FunctionSpace, callable as F(*u, *v) where u and v are Functions and TestFunctions on the real FunctionSpace.
     :arg u: the Function to differentiate F with respect to
     """
+    pass
