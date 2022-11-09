@@ -3,46 +3,72 @@ import firedrake as fd
 
 from ufl.classes import MultiIndex, FixedIndex, Indexed
 
+from enum import IntEnum
+
+# flags for real and imaginary parts
+Part = IntEnum("Part", (("Real", 0), ("Imag", 1)))
+re = Part.Real
+im = Part.Imag
+
+
+def compatible_ufl_elements(elemc, elemr):
+    """
+    Return whether the ufl element elemc is a complex proxy for real ufl element elemr
+
+    :arg elemc: complex proxy ufl element
+    :arg elemr: real ufl element
+    """
+    return True
+
+
+def FiniteElement(elem):
+    """
+    Return a UFL FiniteElement which proxies a complex version of the real UFL FiniteElement elem.
+
+    The returned complex-valued element has as many components as the real-valued element, but each component has a 'real' and 'imaginary' part eg:
+    Scalar real elements become 2-vector complex elements.
+    n-vector real elements become 2xn-tensor complex elements
+    (shape)-tensor real elements become (2,shape)-tensor complex elements
+
+    :arg elem: the UFL FiniteElement to be proxied
+    """
+
+    def scalar_element(elem):
+        return fd.VectorElement(elem, dim=2)
+
+    def vector_element(elem):
+        dim = elem.num_sub_elements()
+        shape = (2, dim)
+        scalar_element = elem.sub_elements()[0]
+        return fd.TensorElement(scalar_element, shape=shape)
+
+    def tensor_element(elem):
+        shape = (2,) + elem._shape
+        scalar_element = elem.sub_elements()[0]
+        return fd.TensorElement(scalar_element, shape=shape)
+
+    if isinstance(elem, fd.TensorElement):
+        return tensor_element(elem)
+    elif isinstance(elem, fd.VectorElement):
+        return vector_element(elem)
+    elif isinstance(elem, fd.MixedElement):  # recurse
+        return fd.MixedElement([FiniteElement(e) for e in elem.sub_elements()])
+    else:
+        return scalar_element(elem)
 
 
 def FunctionSpace(V):
     """
     Return a FunctionSpace which proxies a complex version of the real FunctionSpace V.
 
-    The returned complex-valued function space has as many components as the real-valued function space, but each component has a 'real' and 'imaginary' component eg:
+    The returned complex-valued function space has as many components as the real-valued function space, but each component has a 'real' and 'imaginary' part eg:
     Scalar components of the real-valued function space become 2-vector components of the complex-valued space.
     n-vector components of the real-valued function space become 2xn-tensor components of the complex-valued space.
+    (shape)-tensor components of the real-valued function space become (2,shape)-tensor components of the complex-valued space.
 
     :arg V: the real-valued function space.
     """
-    from functools import reduce, partial
-    from operator import mul
-    fold = partial(reduce, mul)
-
-    W_components = []
-    for V_component in V.split():
-        rank = V_component.rank
-        elem = V_component.ufl_element()
-
-        if rank == 0:  # scalar basis coefficients
-            W_components.append(fd.VectorElement(elem, dim=2))
-
-        elif rank == 1:  # vector basis coefficients
-            assert isinstance(elem, fd.VectorElement)
-            dim = elem.num_sub_elements()
-            shape = (2, dim)
-            scalar_element = elem.sub_elements()[0]
-            W_components.append(fd.TensorElement(scalar_element, shape=shape))
-
-        else:
-            assert isinstance(elem, fd.TensorElement)
-            assert (rank > 0)
-            shape = (2,) + elem._shape
-            scalar_element = elem.sub_elements()[0]
-            W_components.append(fd.TensorElement(scalar_element, shape=shape))
-
-    return fold((fd.FunctionSpace(V.mesh(), w)
-                 for w in W_components))
+    return fd.FunctionSpace(V.mesh(), FiniteElement(V.ufl_element()))
 
 
 def DirichletBC(W, V, bc):
@@ -63,12 +89,12 @@ def split(u, i):
     :arg u: a Coefficient or Argument in the complex FunctionSpace
     :arg i: 0 for real subelements, 1 for imaginary elements
     """
-    if (i!=0) and (i!=1):
-        raise ValueError("i must be 0 for real subelements or 1 for imaginary subelements")
+    if not isinstance(i, Part):
+        raise ValueError("i must be a Part enum")
 
     us = fd.split(u)
 
-    ncomponents = len(us)
+    ncomponents = len(u.split())
 
     if ncomponents == 1:
         return us[i]
@@ -211,7 +237,7 @@ def NonlinearForm(z, F):
 
 def derivative(z, F, u):
     """
-    Return a Form equivalent to z*J if J=dF/du is the derivative of the nonlinear Form F with respect to the complex Function u
+    Return a bilinear Form equivalent to z*J if J=dF/du is the derivative of the nonlinear Form F with respect to the complex Function u
 
     :arg z: a complex number.
     :arg F: a generator function for a nonlinear Form on the real FunctionSpace, callable as F(*u, *v) where u and v are Functions and TestFunctions on the real FunctionSpace.
