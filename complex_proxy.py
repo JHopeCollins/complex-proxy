@@ -18,7 +18,7 @@ def compatible_ufl_elements(elemc, elemr):
     :arg elemc: complex proxy ufl element
     :arg elemr: real ufl element
     """
-    return True
+    return elemc == FiniteElement(elemr)
 
 
 def FiniteElement(elem):
@@ -49,10 +49,13 @@ def FiniteElement(elem):
 
     if isinstance(elem, fd.TensorElement):
         return tensor_element(elem)
+
     elif isinstance(elem, fd.VectorElement):
         return vector_element(elem)
+
     elif isinstance(elem, fd.MixedElement):  # recurse
         return fd.MixedElement([FiniteElement(e) for e in elem.sub_elements()])
+
     else:
         return scalar_element(elem)
 
@@ -87,14 +90,14 @@ def split(u, i):
     If u is a Coefficient or Argument in the complex FunctionSpace, returns a tuple with the function components corresponding to the real or imaginary subelements, indexed appropriately.
 
     :arg u: a Coefficient or Argument in the complex FunctionSpace
-    :arg i: 0 for real subelements, 1 for imaginary elements
+    :arg i: Part.Real for real subelements, Part.Imag for imaginary elements
     """
     if not isinstance(i, Part):
         raise ValueError("i must be a Part enum")
 
     us = fd.split(u)
 
-    ncomponents = len(u.split())
+    ncomponents = len(u.function_space().split())
 
     if ncomponents == 1:
         return us[i]
@@ -107,85 +110,131 @@ def split(u, i):
     return tuple(get_sub_element(cpt, i) for cpt in range(ncomponents))
 
 
-def real_components(u):
-    """
-    Return a tuple of the real components of the complex function u.
-
-    :arg u: indexable of function-like objects from the complex FunctionSpace e.g. TestFunctions, TrialFunctions, split(Function).
-    """
-    pass
-
-
-def imag_components(u):
-    """
-    Return a tuple of the imaginary components of the function u.
-
-    :arg u: indexable of function-like objects from the complex FunctionSpace e.g. TestFunctions, TrialFunctions, split(Function).
-    """
-    pass
-
-
-def get_real(u, vout=None, name=None):
+def get_real(u, vout, name=None):
     """
     Return a real Function equal to the real component of the complex Function u.
 
     :arg u: a complex Function.
-    :arg vout: If a real Function then real component of u is placed here. If None then a new Function is returned.
+    :arg vout: If a real Function then real component of u is placed here. NotImplementedError(If None then a new Function is returned.)
     :arg name: If vout is None, the name of the new Function. Ignored if vout is not none.
     """
-    pass
+    if vout is None:
+        raise NotImplementedError("Inferring real FunctionSpace from complex FunctionSpace not implemented yet")
+    return _get_part(u, vout, Part.Real)
 
 
-def get_imag(u, vout=None, name=None):
+def get_imag(u, vout, name=None):
     """
     Return a real Function equal to the imaginary component of the complex Function u.
 
     :arg u: a complex Function.
-    :arg vout: If a real Function then the imaginary component of u is placed here. If None then a new Function is returned.
+    :arg vout: If a real Function then the imaginary component of u is placed here. NotImplementedError(If None then a new Function is returned.)
     :arg name: If vout is None, the name of the new Function. Ignored if uout is not none.
     """
-    pass
+    if vout is None:
+        raise NotImplementedError("Inferring real FunctionSpace from complex FunctionSpace not implemented yet")
+    return _get_part(u, vout, Part.Imag)
 
 
 def set_real(u, vnew):
     """
-    Set the real component of the complex Function u to the value of the real Function v.
+    Set the real component of the complex Function u to the value of the real Function vnew.
 
     :arg u: a complex Function.
-    :arg uout: A real Function.
+    :arg vnew: A real Function.
     """
-    pass
+    _set_part(u, vnew, Part.Real)
 
 
 def set_imag(u, vnew):
     """
-    Set the imaginary component of the complex Function u to the value of the real Function v.
+    Set the imaginary component of the complex Function u to the value of the real Function vnew.
 
     :arg u: a complex Function.
-    :arg uout: A real Function.
+    :arg vnew: A real Function.
     """
-    pass
+    _set_part(u, vnew, Part.Imag)
 
 
-def _get_components(u, i):
+def _get_part(u, vout, i):
     """
     Return a tuple of the real or imaginary components of the function u.
 
     :arg u: indexable of function-like objects from the complex FunctionSpace e.g. TestFunctions, TrialFunctions, split(Function).
-    :arg i: the index of the components, 0 for real or 1 for imaginary.
+    :arg i: the index of the components, Part.Real for real or Part.Imag for imaginary.
     """
-    pass
+    if not isinstance(i, Part):
+        raise ValueError("i must be a Part enum")
+
+    if not compatible_ufl_elements(u.ufl_element(), vout.ufl_element()):
+        raise ValueError("u and vout must be Functions from the complex and real FunctionSpaces")
+
+    def get_scalar_element(q, p, i):
+        p.assign(q.sub(i))
+
+    def get_vector_element(q, p, i):
+        num_sub = p.num_sub_elements()
+        for j in range(num_sub):
+            p.sub(j).assign(q.sub(i*j))
+
+    def get_tensor_element(q, p, i):
+        num_sub = p.num_sub_elements()
+        for j in range(num_sub):
+            p.sub(j).assign(q.sub(i*j))
+
+    for q, p in zip(u.split(), vout.split()):
+        elem = vout.ufl_element()
+
+        if isinstance(elem, fd.TensorElement):
+            get_tensor_element(q, p, i)
+
+        elif isinstance(elem, fd.VectorElement):
+            get_vector_element(q, p, i)
+
+        else:
+            get_scalar_element(q, p, i)
+
+    return vout
 
 
-def _set_components(u, vnew, i):
+def _set_part(u, vnew, i):
     """
-    Set the real or imaginary components of the complex Function u to the value of the real Function vnew.
+    Set the real or imaginary part of the complex Function u to the value of the real Function vnew.
 
     :arg u: a complex Function.
     :arg v: a real Function.
-    :arg i: the index of the components, 0 for real or 1 for imaginary.
+    :arg i: the index of the components, Part.Real for real or Part.Imag for imaginary.
     """
-    pass
+    if not isinstance(i, Part):
+        raise ValueError("i must be a Part enum")
+
+    if not compatible_ufl_elements(u.ufl_element(), vnew.ufl_element()):
+        raise ValueError("u and vnew must be Functions from the complex and real FunctionSpaces")
+
+    def set_scalar_element(q, p, i):
+        q.sub(i).assign(p)
+
+    def set_vector_element(q, p, i):
+        num_sub = p.num_sub_elements()
+        for j in range(num_sub):
+            q.sub(i*j).assign(p.sub(j))
+
+    def set_tensor_element(q, p, i):
+        num_sub = p.num_sub_elements()
+        for j in range(num_sub):
+            q.sub(i*j).assign(p.sub(j))
+
+    for q, p in zip(u.split(), vnew.split()):
+        elem = vnew.ufl_element()
+
+        if isinstance(elem, fd.TensorElement):
+            set_tensor_element(q, p, i)
+
+        elif isinstance(elem, fd.VectorElement):
+            set_vector_element(q, p, i)
+
+        else:
+            set_scalar_element(q, p, i)
 
 
 def BilinearForm(z, A):

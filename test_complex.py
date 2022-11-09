@@ -9,6 +9,7 @@ import pytest
 def nx():
     return 10
 
+
 @pytest.fixture
 def mesh(nx):
     return fd.UnitSquareMesh(nx, nx)
