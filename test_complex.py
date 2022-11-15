@@ -117,7 +117,7 @@ def test_mixed_function_space(mesh):
         assert wcpt == cpx.FunctionSpace(vcpt)
 
 
-def test_set_get_part(mesh):
+def test_set_get_part_scalar_scalar(mesh):
     """
     Test that the real and imaginary parts are set and get correctly for scalar real FunctionSpace
     """
@@ -143,7 +143,41 @@ def test_set_get_part(mesh):
 
     assert fd.errornorm(u0, u1) < 1e12
 
-    u0.project(y)
+    u0.project(-2*y)
+
+    cpx.set_real(w, u0)
+    cpx.get_real(w, u1)
+
+    assert fd.errornorm(u0, u1) < 1e12
+
+
+def test_set_get_part_scalar_vector(mesh):
+    """
+    Test that the real and imaginary parts are set and get correctly for scalar real FunctionSpace
+    """
+    x, y = fd.SpatialCoordinate(mesh)
+
+    V = fd.FunctionSpace(mesh, "BDM", 1)
+    W = cpx.FunctionSpace(V)
+
+    u0 = fd.Function(V)
+    u1 = fd.Function(V)
+    w = fd.Function(W).assign(0)
+
+    cpx.get_real(w, u0)
+    cpx.get_imag(w, u1)
+
+    assert fd.norm(u0) < 1e12
+    assert fd.norm(u1) < 1e12
+
+    u0.project(fd.as_vector([x, y]))
+
+    cpx.set_real(w, u0)
+    cpx.get_real(w, u1)
+
+    assert fd.errornorm(u0, u1) < 1e12
+
+    u0.project(fd.as_vector([2*y, -0.5*x]))
 
     cpx.set_real(w, u0)
     cpx.get_real(w, u1)
