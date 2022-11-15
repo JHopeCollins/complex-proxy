@@ -115,3 +115,37 @@ def test_mixed_function_space(mesh):
 
     for wcpt, vcpt in zip(W.split(), V.split()):
         assert wcpt == cpx.FunctionSpace(vcpt)
+
+
+def test_set_get_part(mesh):
+    """
+    Test that the real and imaginary parts are set and get correctly for scalar real FunctionSpace
+    """
+    x, y = fd.SpatialCoordinate(mesh)
+
+    V = fd.FunctionSpace(mesh, "CG", 1)
+    W = cpx.FunctionSpace(V)
+
+    u0 = fd.Function(V)
+    u1 = fd.Function(V)
+    w = fd.Function(W).assign(0)
+
+    cpx.get_real(w, u0)
+    cpx.get_imag(w, u1)
+
+    assert fd.norm(u0) < 1e12
+    assert fd.norm(u1) < 1e12
+
+    u0.project(x)
+
+    cpx.set_real(w, u0)
+    cpx.get_real(w, u1)
+
+    assert fd.errornorm(u0, u1) < 1e12
+
+    u0.project(y)
+
+    cpx.set_real(w, u0)
+    cpx.get_real(w, u1)
+
+    assert fd.errornorm(u0, u1) < 1e12

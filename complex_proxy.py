@@ -173,13 +173,11 @@ def _get_part(u, vout, i):
         p.assign(q.sub(i))
 
     def get_vector_element(q, p, i):
-        num_sub = p.num_sub_elements()
-        for j in range(num_sub):
+        for j in range(p.num_sub_elements()):
             p.sub(j).assign(q.sub(i*j))
 
     def get_tensor_element(q, p, i):
-        num_sub = p.num_sub_elements()
-        for j in range(num_sub):
+        for j in range(p.num_sub_elements()):
             p.sub(j).assign(q.sub(i*j))
 
     for q, p in zip(u.split(), vout.split()):
