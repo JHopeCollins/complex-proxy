@@ -192,7 +192,6 @@ def _get_part(u, vout, i):
             get_tensor_element(q, p, i)
 
         elif isinstance(elem, fd.VectorElement):
-            #raise NotImplementedError("get part not implemented for VectorElements yet")
             get_vector_element(q, p, i)
 
         else:
@@ -240,7 +239,6 @@ def _set_part(u, vnew, i):
             set_tensor_element(q, p, i)
 
         elif isinstance(elem, fd.VectorElement):
-            #raise NotImplementedError("set part not implemented for VectorElements yet")
             set_vector_element(q, p, i)
 
         else:

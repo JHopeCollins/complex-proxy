@@ -5,6 +5,26 @@ import complex_proxy as cpx
 import pytest
 
 
+cell = fd.Cell('triangle')
+
+scalar_elements = [
+    pytest.param(fd.FiniteElement("CG", cell, 1), id="CG1"),
+    pytest.param(fd.FiniteElement("BDM", cell, 2), id="BDM1")
+]
+
+vector_elements = [
+    pytest.param(fd.VectorElement("DG", cell, 1), id="VectorDG1"),
+    pytest.param(fd.VectorElement("DG", cell, 1, dim=3), id="VectorDG1_3D")
+]
+
+tensor_elements = [
+    pytest.param(fd.TensorElement("Lagrange", cell, 1), id="TensorL1"),
+    pytest.param(fd.TensorElement("Lagrange", cell, 1, shape=(2, 3, 4)), id="TensorL1_234D")
+]
+
+elements = scalar_elements + vector_elements + tensor_elements
+
+
 @pytest.fixture
 def nx():
     return 10
@@ -15,24 +35,9 @@ def mesh(nx):
     return fd.UnitSquareMesh(nx, nx)
 
 
-cell = fd.Cell('triangle')
-
-scalar_elements = [
-    fd.FiniteElement("CG", cell, 1),
-    fd.FiniteElement("BDM", cell, 2),
-]
-
-vector_elements = [
-    fd.VectorElement("DG", cell, 1),
-    fd.VectorElement("DG", cell, 1, dim=3),
-]
-
-tensor_elements = [
-    fd.TensorElement("Lagrange", cell, 1),
-    fd.TensorElement("Lagrange", cell, 1, shape=(2, 3, 4))
-]
-
-elements = scalar_elements + vector_elements + tensor_elements
+@pytest.fixture
+def mixed_element():
+    return fd.MixedElement([param.values[0] for param in elements])
 
 
 @pytest.mark.parametrize("elem", scalar_elements)
@@ -78,16 +83,16 @@ def test_tensor_element(elem):
         assert ce == elem.sub_elements()[0]
 
 
-def test_mixed_element():
+def test_mixed_element(mixed_element):
     """
     Test that the complex proxy FiniteElement is constructed correctly from a real MixedElement.
     """
-    mixed_elem = fd.MixedElement(elements)
-    celem = cpx.FiniteElement(mixed_elem)
 
-    assert celem.num_sub_elements() == mixed_elem.num_sub_elements()
+    celem = cpx.FiniteElement(mixed_element)
 
-    for csub, msub in zip(celem.sub_elements(), mixed_elem.sub_elements()):
+    assert celem.num_sub_elements() == mixed_element.num_sub_elements()
+
+    for csub, msub in zip(celem.sub_elements(), mixed_element.sub_elements()):
         assert csub == cpx.FiniteElement(msub)
 
 
@@ -102,13 +107,12 @@ def test_function_space(mesh, elem):
     assert W.ufl_element() == cpx.FiniteElement(elem)
 
 
-def test_mixed_function_space(mesh):
+def test_mixed_function_space(mesh, mixed_element):
     """
     Test that the proxy complex FunctionSpace is correctly constructed for a mixed real FunctionSpace
     """
-    mixed_elem = fd.MixedElement(elements)
 
-    V = fd.FunctionSpace(mesh, mixed_elem)
+    V = fd.FunctionSpace(mesh, mixed_element)
     W = cpx.FunctionSpace(V)
 
     assert len(W.split()) == len(V.split())
@@ -221,6 +225,7 @@ def test_set_get_part_vector(mesh, elem):
     assert fd.errornorm(u0, u1) < 1e12
 
 
+@pytest.mark.skip
 def test_bilinear_form(mesh):
     """
     Test that the bilinear form is constructed correctly
