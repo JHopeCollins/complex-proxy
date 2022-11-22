@@ -117,7 +117,7 @@ def test_mixed_function_space(mesh):
         assert wcpt == cpx.FunctionSpace(vcpt)
 
 
-def test_set_get_part_scalar_scalar(mesh):
+def test_set_get_part_scalar_cg(mesh):
     """
     Test that the real and imaginary parts are set and get correctly for scalar real FunctionSpace
     """
@@ -145,13 +145,13 @@ def test_set_get_part_scalar_scalar(mesh):
 
     u0.project(-2*y)
 
-    cpx.set_real(w, u0)
-    cpx.get_real(w, u1)
+    cpx.set_imag(w, u0)
+    cpx.get_imag(w, u1)
 
     assert fd.errornorm(u0, u1) < 1e12
 
 
-def test_set_get_part_scalar_vector(mesh):
+def test_set_get_part_scalar_bdm(mesh):
     """
     Test that the real and imaginary parts are set and get correctly for scalar real FunctionSpace
     """
@@ -179,7 +179,100 @@ def test_set_get_part_scalar_vector(mesh):
 
     u0.project(fd.as_vector([2*y, -0.5*x]))
 
+    cpx.set_imag(w, u0)
+    cpx.get_imag(w, u1)
+
+    assert fd.errornorm(u0, u1) < 1e12
+
+
+@pytest.mark.parametrize("elem", vector_elements)
+def test_set_get_part_vector(mesh, elem):
+    """
+    Test that the real and imaginary parts are set and get correctly for real VectorFunctionSpace
+    """
+    x, y = fd.SpatialCoordinate(mesh)
+
+    V = fd.FunctionSpace(mesh, elem)
+    W = cpx.FunctionSpace(V)
+
+    u0 = fd.Function(V)
+    u1 = fd.Function(V)
+    w = fd.Function(W).assign(0)
+
+    cpx.get_real(w, u0)
+    cpx.get_imag(w, u1)
+
+    assert fd.norm(u0) < 1e12
+    assert fd.norm(u1) < 1e12
+
+    # u0.project(fd.as_vector([x, y]))
+    u0.project(fd.as_vector([x*i for i in range(elem.num_sub_elements())]))
+
     cpx.set_real(w, u0)
     cpx.get_real(w, u1)
 
     assert fd.errornorm(u0, u1) < 1e12
+
+    u0.project(fd.as_vector([-y*i for i in range(elem.num_sub_elements())]))
+
+    cpx.set_imag(w, u0)
+    cpx.get_imag(w, u1)
+
+    assert fd.errornorm(u0, u1) < 1e12
+
+
+def test_bilinear_form(mesh):
+    """
+    Test that the bilinear form is constructed correctly
+    """
+    V = fd.FunctionSpace(mesh, "CG", 1)
+    W = cpx.FunctionSpace(V)
+
+    def form_function(u, v):
+        return fd.inner(fd.grad(u), fd.grad(v))*fd.dx
+
+    # non-zero only on diagonal blocks: real and imag parts independent
+    re = 1+0j
+
+    K = cpx.BilinearForm(W, re, form_function)
+
+    # make rhs same for both
+
+    # solve
+
+    # check both have same correct answer
+
+    # different rhs for real and imaginary
+
+    # check both have different correct answer
+    # non-zero only on off-diagonal blocks: real and imag parts independent and use rhs of opposite part
+    im = 1+0j
+
+    K = cpx.BilinearForm(W, im, form_function)
+
+    # make rhs same for both
+
+    # solve
+
+    # check both have same correct answer
+
+    # different rhs for real and imaginary
+
+    # check both have different correct answer
+
+    # check both have different correct answer
+
+    # non-zero on all blocks: solution should be linear combination of solutions of two previous problems
+    z = 1+1j
+
+    K = cpx.BilinearForm(W, z, form_function)
+
+    # make rhs same for both
+
+    # solve
+
+    # check both have correct answer
+
+    # different rhs for real and imaginary
+
+    # check both have correct answer

@@ -100,7 +100,7 @@ def split(u, i):
     ncomponents = len(u.function_space().split())
 
     if ncomponents == 1:
-        return us[i]
+        return tuple((us[i],))
 
     def get_sub_element(cpt, i):
         part = us[cpt]
@@ -173,20 +173,26 @@ def _get_part(u, vout, i):
         p.assign(q.sub(i))
 
     def get_vector_element(q, p, i):
-        for j in range(p.num_sub_elements()):
-            p.sub(j).assign(q.sub(i*j))
+        for j in range(p.ufl_element().num_sub_elements()):
+            # TODO This is almost certainly not the right thing to do
+            #      will it break in parallel?
+            p.sub(j).dat.data[:] = q.sub(i*j).dat.data_ro[:]
+            # TODO Is this what we want to do instead? Or interpolate/project?
+            # p.sub(j).assign(q.sub(i*j))
 
     def get_tensor_element(q, p, i):
-        for j in range(p.num_sub_elements()):
+        for j in range(p.ufl_element().num_sub_elements()):
             p.sub(j).assign(q.sub(i*j))
 
     for q, p in zip(u.split(), vout.split()):
         elem = vout.ufl_element()
 
         if isinstance(elem, fd.TensorElement):
+            raise NotImplementedError("get part not implemented for TensorElements yet")
             get_tensor_element(q, p, i)
 
         elif isinstance(elem, fd.VectorElement):
+            #raise NotImplementedError("get part not implemented for VectorElements yet")
             get_vector_element(q, p, i)
 
         else:
@@ -213,12 +219,16 @@ def _set_part(u, vnew, i):
         q.sub(i).assign(p)
 
     def set_vector_element(q, p, i):
-        num_sub = p.num_sub_elements()
+        num_sub = p.ufl_element().num_sub_elements()
         for j in range(num_sub):
-            q.sub(i*j).assign(p.sub(j))
+            # TODO This is almost certainly not the right thing to do
+            #      will it break in parallel?
+            q.sub(i*j).dat.data[:] = p.sub(j).dat.data_ro[:]
+            # TODO Is this what we want to do instead? Or interpolate/project?
+            # q.sub(i*j).assign(p.sub(j))
 
     def set_tensor_element(q, p, i):
-        num_sub = p.num_sub_elements()
+        num_sub = p.ufl_element().num_sub_elements()
         for j in range(num_sub):
             q.sub(i*j).assign(p.sub(j))
 
@@ -226,16 +236,18 @@ def _set_part(u, vnew, i):
         elem = vnew.ufl_element()
 
         if isinstance(elem, fd.TensorElement):
+            raise NotImplementedError("set part not implemented for TensorElements yet")
             set_tensor_element(q, p, i)
 
         elif isinstance(elem, fd.VectorElement):
+            #raise NotImplementedError("set part not implemented for VectorElements yet")
             set_vector_element(q, p, i)
 
         else:
             set_scalar_element(q, p, i)
 
 
-def BilinearForm(z, A):
+def BilinearForm(W, z, A):
     """
     Return a bilinear Form on the complex FunctionSpace equal to a complex multiple of a bilinear Form on the real FunctionSpace.
     If z = zr + i*zi is a complex number, u = ur + i*ui is a complex Function, and b = br + i*bi is a complex linear Form, we want to construct a Form such that (zA)u=b
@@ -250,7 +262,20 @@ def BilinearForm(z, A):
     :arg z: a complex number.
     :arg A: a generator function for a bilinear Form on the real FunctionSpace, callable as A(*u, *v) where u and v are TrialFunctions and TestFunctions on the real FunctionSpace.
     """
-    pass
+    u = fd.TrialFunction(W)
+    v = fd.TestFunction(W)
+
+    ur = split(u, Part.Real)
+    ui = split(u, Part.Imag)
+
+    vr = split(v, Part.Real)
+    vi = split(v, Part.Imag)
+
+    A11 = z.real*A(*ur, *vr)
+    A12 = -z.imag*A(*ui, *vr)
+    A21 = z.imag*A(*ur, *vi)
+    A22 = z.real*A(*ui, *vi)
+    return A11 + A12 + A21 + A22
 
 
 def LinearForm(z, f):
