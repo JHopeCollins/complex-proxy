@@ -25,6 +25,9 @@ tensor_elements = [
 elements = scalar_elements + vector_elements + tensor_elements
 
 
+complex_numbers = [2+0j, 0+3j, 3+2j]
+
+
 @pytest.fixture
 def nx():
     return 10
@@ -166,6 +169,40 @@ def test_set_get_part(mesh, elem):
 
     assert fd.errornorm(u0, ur) < 1e12
     assert fd.errornorm(u1, ui) < 1e12
+
+
+@pytest.mark.parametrize("z", complex_numbers)
+def test_linear_form(mesh, z):
+    """
+    Test that the linear Form is constructed correctly
+    """
+    V = fd.FunctionSpace(mesh, "CG", 1)
+    W = cpx.FunctionSpace(V)
+
+    x, y = fd.SpatialCoordinate(mesh)
+
+    f = x*x-y
+
+    def L(v):
+        return fd.inner(f, v)*fd.dx
+
+    v = fd.TestFunction(V)
+    rhs = fd.assemble(L(v))
+
+    ur = fd.Function(V)
+    ui = fd.Function(V)
+    w = fd.Function(W)
+
+    fd.assemble(cpx.LinearForm(W, z, L),
+                tensor=w)
+
+    cpx.get_real(w, ur)
+    cpx.get_imag(w, ui)
+
+    zr = z.real
+    zi = z.imag
+    assert fd.errornorm(zr*rhs, ur) < 1e-12
+    assert fd.errornorm(zi*rhs, ui) < 1e-12
 
 
 @pytest.mark.skip

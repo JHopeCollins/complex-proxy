@@ -218,6 +218,27 @@ def _set_part(u, vnew, i):
             part.assign(p.sub(j))
 
 
+def LinearForm(W, z, f):
+    """
+    Return a Linear Form on the complex FunctionSpace W equal to a complex multiple of a linear Form on the real FunctionSpace.
+    If z = zr + i*zi is a complex number, v = vr + i*vi is a complex TestFunction, we want to construct a Form <v,zf>
+
+    <v,zf> = <(vr + i*vi),(zr + i*zi)f>
+           = <zr*vr,f> + i<zi*vi,f>
+
+    :arg W: the complex-proxy FunctionSpace
+    :arg z: a complex number.
+    :arg f: a generator function for a linear Form on the real FunctionSpace, callable as f(*v) where v are TestFunctions on the real FunctionSpace.
+    """
+    v = fd.TestFunction(W)
+    vr = split(v, Part.Real)
+    vi = split(v, Part.Imag)
+
+    fr = z.real*f(*vr)
+    fi = z.imag*f(*vi)
+    return fr + fi
+
+
 def BilinearForm(W, z, A):
     """
     Return a bilinear Form on the complex FunctionSpace W equal to a complex multiple of a bilinear Form on the real FunctionSpace.
@@ -248,27 +269,6 @@ def BilinearForm(W, z, A):
     A21 = z.imag*A(*ur, *vi)
     A22 = z.real*A(*ui, *vi)
     return A11 + A12 + A21 + A22
-
-
-def LinearForm(W, z, f):
-    """
-    Return a Linear Form on the complex FunctionSpace W equal to a complex multiple of a linear Form on the real FunctionSpace.
-    If z = zr + i*zi is a complex number, v = vr + i*vi is a complex TestFunction, we want to construct a Form <v,zf>
-
-    <v,zf> = <(vr + i*vi),(zr + i*zi)f>
-           = <zr*vr,f> + i<zi*vi,f>
-
-    :arg W: the complex-proxy FunctionSpace
-    :arg z: a complex number.
-    :arg f: a generator function for a linear Form on the real FunctionSpace, callable as f(*v) where v are TestFunctions on the real FunctionSpace.
-    """
-    v = fd.TestFunctions(W)
-    vr = split(v, Part.Real)
-    vi = split(v, Part.Imag)
-
-    fr = z.real*f(*vr)
-    fi = z.imag*f(*vi)
-    return fr + fi
 
 
 def NonlinearForm(z, F):
