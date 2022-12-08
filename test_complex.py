@@ -121,72 +121,52 @@ def test_mixed_function_space(mesh, mixed_element):
         assert wcpt == cpx.FunctionSpace(vcpt)
 
 
-def test_set_get_part_scalar_cg(mesh):
+@pytest.mark.parametrize("elem", scalar_elements)
+def test_set_get_part_scalar(mesh, elem):
     """
     Test that the real and imaginary parts are set and get correctly for scalar real FunctionSpace
     """
     x, y = fd.SpatialCoordinate(mesh)
 
-    V = fd.FunctionSpace(mesh, "CG", 1)
+    if elem.reference_value_shape() != ():
+        dim = elem.reference_value_shape()[0]
+        expr0 = fd.as_vector([x*i for i in range(dim)])
+        expr1 = fd.as_vector([-y*i for i in range(dim)])
+        assert elem.family() != fd.FiniteElement("CG", cell, 1)
+    else:
+        expr0 = x
+        expr1 = -2*y
+
+    V = fd.FunctionSpace(mesh, elem)
     W = cpx.FunctionSpace(V)
 
-    u0 = fd.Function(V)
-    u1 = fd.Function(V)
+    u0 = fd.Function(V).project(expr0)
+    u1 = fd.Function(V).project(expr1)
+    ur = fd.Function(V).assign(1)
+    ui = fd.Function(V).assign(1)
     w = fd.Function(W).assign(0)
 
-    cpx.get_real(w, u0)
-    cpx.get_imag(w, u1)
+    cpx.get_real(w, ur)
+    cpx.get_imag(w, ui)
 
-    assert fd.norm(u0) < 1e12
-    assert fd.norm(u1) < 1e12
-
-    u0.project(x)
+    assert fd.norm(ur) < 1e12
+    assert fd.norm(ui) < 1e12
 
     cpx.set_real(w, u0)
-    cpx.get_real(w, u1)
 
-    assert fd.errornorm(u0, u1) < 1e12
+    cpx.get_real(w, ur)
+    cpx.get_imag(w, ui)
 
-    u0.project(-2*y)
+    assert fd.errornorm(u0, ur) < 1e12
+    assert fd.norm(ui) < 1e12
 
-    cpx.set_imag(w, u0)
-    cpx.get_imag(w, u1)
+    cpx.set_imag(w, u1)
 
-    assert fd.errornorm(u0, u1) < 1e12
+    cpx.get_real(w, ur)
+    cpx.get_imag(w, ui)
 
-
-def test_set_get_part_scalar_bdm(mesh):
-    """
-    Test that the real and imaginary parts are set and get correctly for scalar real FunctionSpace
-    """
-    x, y = fd.SpatialCoordinate(mesh)
-
-    V = fd.FunctionSpace(mesh, "BDM", 1)
-    W = cpx.FunctionSpace(V)
-
-    u0 = fd.Function(V)
-    u1 = fd.Function(V)
-    w = fd.Function(W).assign(0)
-
-    cpx.get_real(w, u0)
-    cpx.get_imag(w, u1)
-
-    assert fd.norm(u0) < 1e12
-    assert fd.norm(u1) < 1e12
-
-    u0.project(fd.as_vector([x, y]))
-
-    cpx.set_real(w, u0)
-    cpx.get_real(w, u1)
-
-    assert fd.errornorm(u0, u1) < 1e12
-
-    u0.project(fd.as_vector([2*y, -0.5*x]))
-
-    cpx.set_imag(w, u0)
-    cpx.get_imag(w, u1)
-
-    assert fd.errornorm(u0, u1) < 1e12
+    assert fd.errornorm(u0, ur) < 1e12
+    assert fd.errornorm(u1, ui) < 1e12
 
 
 @pytest.mark.parametrize("elem", vector_elements)
@@ -199,30 +179,36 @@ def test_set_get_part_vector(mesh, elem):
     V = fd.FunctionSpace(mesh, elem)
     W = cpx.FunctionSpace(V)
 
-    u0 = fd.Function(V)
-    u1 = fd.Function(V)
+    vec0 = fd.as_vector([x*i for i in range(elem.num_sub_elements())])
+    vec1 = fd.as_vector([-y*i for i in range(elem.num_sub_elements())])
+
+    u0 = fd.Function(V).project(vec0)
+    u1 = fd.Function(V).project(vec1)
+    ur = fd.Function(V).assign(1)
+    ui = fd.Function(V).assign(1)
     w = fd.Function(W).assign(0)
 
-    cpx.get_real(w, u0)
-    cpx.get_imag(w, u1)
+    cpx.get_real(w, ur)
+    cpx.get_imag(w, ui)
 
-    assert fd.norm(u0) < 1e12
-    assert fd.norm(u1) < 1e12
-
-    # u0.project(fd.as_vector([x, y]))
-    u0.project(fd.as_vector([x*i for i in range(elem.num_sub_elements())]))
+    assert fd.norm(ur) < 1e12
+    assert fd.norm(ui) < 1e12
 
     cpx.set_real(w, u0)
-    cpx.get_real(w, u1)
 
-    assert fd.errornorm(u0, u1) < 1e12
+    cpx.get_real(w, ur)
+    cpx.get_imag(w, ui)
 
-    u0.project(fd.as_vector([-y*i for i in range(elem.num_sub_elements())]))
+    assert fd.errornorm(u0, ur) < 1e12
+    assert fd.norm(ui) < 1e12
 
-    cpx.set_imag(w, u0)
-    cpx.get_imag(w, u1)
+    cpx.set_imag(w, u1)
 
-    assert fd.errornorm(u0, u1) < 1e12
+    cpx.get_real(w, ur)
+    cpx.get_imag(w, ui)
+
+    assert fd.errornorm(u0, ur) < 1e12
+    assert fd.errornorm(u1, ui) < 1e12
 
 
 @pytest.mark.skip

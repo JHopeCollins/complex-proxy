@@ -87,7 +87,9 @@ def DirichletBC(W, V, bc):
 
 def split(u, i):
     """
-    If u is a Coefficient or Argument in the complex FunctionSpace, returns a tuple with the function components corresponding to the real or imaginary subelements, indexed appropriately.
+    If u is a Coefficient or Argument in the complex FunctionSpace,
+        returns a tuple with the function components corresponding
+        to the real or imaginary subelements, indexed appropriately.
 
     :arg u: a Coefficient or Argument in the complex FunctionSpace
     :arg i: Part.Real for real subelements, Part.Imag for imaginary elements
