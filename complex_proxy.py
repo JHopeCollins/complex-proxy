@@ -176,11 +176,7 @@ def _get_part(u, vout, i):
 
     def get_vector_element(q, p, i):
         for j in range(p.ufl_element().num_sub_elements()):
-            # TODO This is almost certainly not the right thing to do
-            #      will it break in parallel?
-            p.sub(j).dat.data[:] = q.sub(i*j).dat.data_ro[:]
-            # TODO Is this what we want to do instead? Or interpolate/project?
-            # p.sub(j).assign(q.sub(i*j))
+            p.sub(j).assign(q.sub(i*j))
 
     def get_tensor_element(q, p, i):
         for j in range(p.ufl_element().num_sub_elements()):
@@ -222,11 +218,7 @@ def _set_part(u, vnew, i):
     def set_vector_element(q, p, i):
         num_sub = p.ufl_element().num_sub_elements()
         for j in range(num_sub):
-            # TODO This is almost certainly not the right thing to do
-            #      will it break in parallel?
-            q.sub(i*j).dat.data[:] = p.sub(j).dat.data_ro[:]
-            # TODO Is this what we want to do instead? Or interpolate/project?
-            # q.sub(i*j).assign(p.sub(j))
+            q.sub(i*j).assign(p.sub(j))
 
     def set_tensor_element(q, p, i):
         num_sub = p.ufl_element().num_sub_elements()
