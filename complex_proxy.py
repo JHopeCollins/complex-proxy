@@ -158,11 +158,32 @@ def set_imag(u, vnew):
     _set_part(u, vnew, Part.Imag)
 
 
+def _part_generator(u, i):
+    """
+    Return a tuple of the real or imaginary components of the complex function u.
+
+    :arg u: a complex Function.
+    :arg i: the index of the components, Part.Real for real or Part.Imag for imaginary.
+    """
+    elem = u.ufl_element()
+
+    if isinstance(elem, fd.TensorElement):
+        num_sub_real = elem.num_sub_elements()//2
+        return (u.sub(i*num_sub_real + j) for j in range(num_sub_real))
+
+    elif isinstance(elem, fd.VectorElement):
+        return (u.sub(i),)
+
+    else:
+        raise ValueError("u must be a function from a complex-proxy FunctionSpace")
+
+
 def _get_part(u, vout, i):
     """
-    Return a tuple of the real or imaginary components of the function u.
+    Get the real or imaginary part of the complex Function u and copy it to real Function vout.
 
-    :arg u: indexable of function-like objects from the complex FunctionSpace e.g. TestFunctions, TrialFunctions, split(Function).
+    :arg u: a complex Function.
+    :arg vout: a real Function.
     :arg i: the index of the components, Part.Real for real or Part.Imag for imaginary.
     """
     if not isinstance(i, Part):
@@ -171,29 +192,9 @@ def _get_part(u, vout, i):
     if not compatible_ufl_elements(u.ufl_element(), vout.ufl_element()):
         raise ValueError("u and vout must be Functions from the complex and real FunctionSpaces")
 
-    def get_scalar_element(q, p, i):
-        p.assign(q.sub(i))
-
-    def get_vector_element(q, p, i):
-        for j in range(p.ufl_element().num_sub_elements()):
-            p.sub(j).assign(q.sub(i*j))
-
-    def get_tensor_element(q, p, i):
-        for j in range(p.ufl_element().num_sub_elements()):
-            p.sub(j).assign(q.sub(i*j))
-
     for q, p in zip(u.split(), vout.split()):
-        elem = vout.ufl_element()
-
-        if isinstance(elem, fd.TensorElement):
-            raise NotImplementedError("get part not implemented for TensorElements yet")
-            get_tensor_element(q, p, i)
-
-        elif isinstance(elem, fd.VectorElement):
-            get_vector_element(q, p, i)
-
-        else:
-            get_scalar_element(q, p, i)
+        for i, part in enumerate(_part_generator(q, i)):
+            p.sub(i).assign(part)
 
     return vout
 
@@ -203,7 +204,7 @@ def _set_part(u, vnew, i):
     Set the real or imaginary part of the complex Function u to the value of the real Function vnew.
 
     :arg u: a complex Function.
-    :arg v: a real Function.
+    :arg vnew: a real Function.
     :arg i: the index of the components, Part.Real for real or Part.Imag for imaginary.
     """
     if not isinstance(i, Part):
@@ -212,31 +213,9 @@ def _set_part(u, vnew, i):
     if not compatible_ufl_elements(u.ufl_element(), vnew.ufl_element()):
         raise ValueError("u and vnew must be Functions from the complex and real FunctionSpaces")
 
-    def set_scalar_element(q, p, i):
-        q.sub(i).assign(p)
-
-    def set_vector_element(q, p, i):
-        num_sub = p.ufl_element().num_sub_elements()
-        for j in range(num_sub):
-            q.sub(i*j).assign(p.sub(j))
-
-    def set_tensor_element(q, p, i):
-        num_sub = p.ufl_element().num_sub_elements()
-        for j in range(num_sub):
-            q.sub(i*j).assign(p.sub(j))
-
     for q, p in zip(u.split(), vnew.split()):
-        elem = vnew.ufl_element()
-
-        if isinstance(elem, fd.TensorElement):
-            raise NotImplementedError("set part not implemented for TensorElements yet")
-            set_tensor_element(q, p, i)
-
-        elif isinstance(elem, fd.VectorElement):
-            set_vector_element(q, p, i)
-
-        else:
-            set_scalar_element(q, p, i)
+        for i, part in enumerate(_part_generator(q, i)):
+            part.assign(p.sub(i))
 
 
 def BilinearForm(W, z, A):
