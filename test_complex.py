@@ -121,8 +121,8 @@ def test_mixed_function_space(mesh, mixed_element):
         assert wcpt == cpx.FunctionSpace(vcpt)
 
 
-@pytest.mark.parametrize("elem", scalar_elements)
-def test_set_get_part_scalar(mesh, elem):
+@pytest.mark.parametrize("elem", scalar_elements+vector_elements)
+def test_set_get_part(mesh, elem):
     """
     Test that the real and imaginary parts are set and get correctly for scalar real FunctionSpace
     """
@@ -132,7 +132,6 @@ def test_set_get_part_scalar(mesh, elem):
         dim = elem.reference_value_shape()[0]
         expr0 = fd.as_vector([x*i for i in range(dim)])
         expr1 = fd.as_vector([-y*i for i in range(dim)])
-        assert elem.family() != fd.FiniteElement("CG", cell, 1)
     else:
         expr0 = x
         expr1 = -2*y
@@ -142,48 +141,6 @@ def test_set_get_part_scalar(mesh, elem):
 
     u0 = fd.Function(V).project(expr0)
     u1 = fd.Function(V).project(expr1)
-    ur = fd.Function(V).assign(1)
-    ui = fd.Function(V).assign(1)
-    w = fd.Function(W).assign(0)
-
-    cpx.get_real(w, ur)
-    cpx.get_imag(w, ui)
-
-    assert fd.norm(ur) < 1e12
-    assert fd.norm(ui) < 1e12
-
-    cpx.set_real(w, u0)
-
-    cpx.get_real(w, ur)
-    cpx.get_imag(w, ui)
-
-    assert fd.errornorm(u0, ur) < 1e12
-    assert fd.norm(ui) < 1e12
-
-    cpx.set_imag(w, u1)
-
-    cpx.get_real(w, ur)
-    cpx.get_imag(w, ui)
-
-    assert fd.errornorm(u0, ur) < 1e12
-    assert fd.errornorm(u1, ui) < 1e12
-
-
-@pytest.mark.parametrize("elem", vector_elements)
-def test_set_get_part_vector(mesh, elem):
-    """
-    Test that the real and imaginary parts are set and get correctly for real VectorFunctionSpace
-    """
-    x, y = fd.SpatialCoordinate(mesh)
-
-    V = fd.FunctionSpace(mesh, elem)
-    W = cpx.FunctionSpace(V)
-
-    vec0 = fd.as_vector([x*i for i in range(elem.num_sub_elements())])
-    vec1 = fd.as_vector([-y*i for i in range(elem.num_sub_elements())])
-
-    u0 = fd.Function(V).project(vec0)
-    u1 = fd.Function(V).project(vec1)
     ur = fd.Function(V).assign(1)
     ui = fd.Function(V).assign(1)
     w = fd.Function(W).assign(0)
