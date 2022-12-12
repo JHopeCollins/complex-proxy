@@ -25,8 +25,6 @@ tensor_elements = [
 elements = scalar_elements + vector_elements + tensor_elements
 
 
-complex_numbers = [2+0j, 0+3j, 3+2j]
-
 
 @pytest.fixture
 def nx():
@@ -170,18 +168,26 @@ def test_set_get_part(mesh, elem):
     assert fd.errornorm(u0, ur) < 1e12
     assert fd.errornorm(u1, ui) < 1e12
 
+complex_numbers = [2+0j]#, 0+3j, 3+2j]
 
+
+@pytest.mark.parametrize("elem", scalar_elements)
 @pytest.mark.parametrize("z", complex_numbers)
-def test_linear_form(mesh, z):
+def test_linear_form(mesh, elem, z):
     """
     Test that the linear Form is constructed correctly
     """
-    V = fd.FunctionSpace(mesh, "CG", 1)
+    V = fd.FunctionSpace(mesh, elem)
     W = cpx.FunctionSpace(V)
 
     x, y = fd.SpatialCoordinate(mesh)
 
     f = x*x-y
+    if elem.reference_value_shape() != ():
+        dim = elem.reference_value_shape()[0]
+        f = fd.as_vector([x*x-y, y+x])
+    else:
+        f = x*x-y
 
     def L(v):
         return fd.inner(f, v)*fd.dx
@@ -205,7 +211,6 @@ def test_linear_form(mesh, z):
     assert fd.errornorm(zi*rhs, ui) < 1e-12
 
 
-@pytest.mark.skip
 def test_bilinear_form(mesh):
     """
     Test that the bilinear form is constructed correctly
@@ -213,51 +218,77 @@ def test_bilinear_form(mesh):
     V = fd.FunctionSpace(mesh, "CG", 1)
     W = cpx.FunctionSpace(V)
 
+    x, y = fd.SpatialCoordinate(mesh)
+    f = fd.Function(V).interpolate(x*x-y)
+
     def form_function(u, v):
         return fd.inner(fd.grad(u), fd.grad(v))*fd.dx
 
+    u = fd.TrialFunction(V)
+    v = fd.TestFunction(V)
+
+    a = form_function(u, v)
+
+    # the real value
+    b = fd.assemble(fd.action(a, f))
+
+    # complex vector to multiply
+    g = fd.Function(W)
+
+    cpx.set_real(g, f)
+    f.assign(2*f)
+    cpx.set_imag(g, f)
+
+    # real/imag parts of mat-vec product
+    br = fd.Function(V)
+    bi = fd.Function(V)
+
     # non-zero only on diagonal blocks: real and imag parts independent
-    re = 1+0j
+    zr = 3+0j
+    wr = fd.Function(W)
 
-    K = cpx.BilinearForm(W, re, form_function)
+    K = cpx.BilinearForm(W, zr, form_function)
+    fd.assemble(fd.action(K, g), tensor=wr)
 
-    # make rhs same for both
+    cpx.get_real(wr, br)
+    cpx.get_imag(wr, bi)
 
-    # solve
+    assert fd.errornorm(3*1*b, br) < 1e-12
+    assert fd.errornorm(3*2*b, bi) < 1e-12
 
-    # check both have same correct answer
+    # non-zero only on off-diagonal blocks: real and imag parts independent
+    zi = 0+4j
 
-    # different rhs for real and imaginary
+    wi = fd.Function(W)
 
-    # check both have different correct answer
-    # non-zero only on off-diagonal blocks: real and imag parts independent and use rhs of opposite part
-    im = 1+0j
+    K = cpx.BilinearForm(W, zi, form_function)
+    fd.assemble(fd.action(K, g), tensor=wi)
 
-    K = cpx.BilinearForm(W, im, form_function)
+    cpx.get_real(wi, br)
+    cpx.get_imag(wi, bi)
 
-    # make rhs same for both
+    assert fd.errornorm(-4*2*b, br) < 1e-12
+    assert fd.errornorm(4*1*b, bi) < 1e-12
 
-    # solve
+    # non-zero in all blocks:
+    z = zr + zi
 
-    # check both have same correct answer
-
-    # different rhs for real and imaginary
-
-    # check both have different correct answer
-
-    # check both have different correct answer
-
-    # non-zero on all blocks: solution should be linear combination of solutions of two previous problems
-    z = 1+1j
+    wz = fd.Function(W)
 
     K = cpx.BilinearForm(W, z, form_function)
+    fd.assemble(fd.action(K, g), tensor=wz)
 
-    # make rhs same for both
+    cpx.get_real(wz, br)
+    cpx.get_imag(wz, bi)
 
-    # solve
+    # mat-vec multiplication should be linear
+    br_check = fd.Function(V)
+    bi_check = fd.Function(V)
 
-    # check both have correct answer
+    wz.assign(wr + wi)
 
-    # different rhs for real and imaginary
+    cpx.get_real(wz, br_check)
+    cpx.get_imag(wz, bi_check)
 
-    # check both have correct answer
+    assert fd.errornorm(br_check, br) < 1e-12
+    assert fd.errornorm(bi_check, bi) < 1e-12
