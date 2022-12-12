@@ -25,6 +25,9 @@ tensor_elements = [
 elements = scalar_elements + vector_elements + tensor_elements
 
 
+complex_numbers = [2+0j, 0+3j, 3+2j]
+
+
 @pytest.fixture
 def nx():
     return 10
@@ -166,9 +169,6 @@ def test_set_get_part(mesh, elem):
 
     assert fd.errornorm(u0, ur) < 1e12
     assert fd.errornorm(u1, ui) < 1e12
-
-
-complex_numbers = [2+0j]  # , 0+3j, 3+2j]
 
 
 @pytest.mark.parametrize("elem", scalar_elements)
