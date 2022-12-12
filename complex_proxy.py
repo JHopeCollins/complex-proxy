@@ -32,32 +32,21 @@ def FiniteElement(elem):
 
     :arg elem: the UFL FiniteElement to be proxied
     """
-
-    def scalar_element(elem):
-        return fd.VectorElement(elem, dim=2)
-
-    def vector_element(elem):
-        dim = elem.num_sub_elements()
-        shape = (2, dim)
-        scalar_element = elem.sub_elements()[0]
-        return fd.TensorElement(scalar_element, shape=shape)
-
-    def tensor_element(elem):
+    if isinstance(elem, fd.TensorElement):
         shape = (2,) + elem._shape
         scalar_element = elem.sub_elements()[0]
         return fd.TensorElement(scalar_element, shape=shape)
 
-    if isinstance(elem, fd.TensorElement):
-        return tensor_element(elem)
-
     elif isinstance(elem, fd.VectorElement):
-        return vector_element(elem)
+        shape = (2, elem.num_sub_elements())
+        scalar_element = elem.sub_elements()[0]
+        return fd.TensorElement(scalar_element, shape=shape)
 
     elif isinstance(elem, fd.MixedElement):  # recurse
         return fd.MixedElement([FiniteElement(e) for e in elem.sub_elements()])
 
     else:
-        return scalar_element(elem)
+        return fd.VectorElement(elem, dim=2)
 
 
 def FunctionSpace(V):
