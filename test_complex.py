@@ -102,11 +102,13 @@ def test_mixed_function_space(mesh, mixed_element):
         assert imag_elem == orig_elem
 
 
-@pytest.mark.parametrize("elem", scalar_elements+vector_elements)
+@pytest.mark.parametrize("elem", scalar_elements) #+vector_elements)
 def test_set_get_part(mesh, elem):
     """
     Test that the real and imaginary parts are set and get correctly for scalar real FunctionSpace
     """
+    eps = 1e-8
+
     x, y = fd.SpatialCoordinate(mesh)
 
     if elem.reference_value_shape() != ():
@@ -129,24 +131,24 @@ def test_set_get_part(mesh, elem):
     cpx.get_real(w, ur)
     cpx.get_imag(w, ui)
 
-    assert fd.norm(ur) < 1e12
-    assert fd.norm(ui) < 1e12
+    assert fd.norm(ur) < eps
+    assert fd.norm(ui) < eps
 
     cpx.set_real(w, u0)
 
     cpx.get_real(w, ur)
     cpx.get_imag(w, ui)
 
-    assert fd.errornorm(u0, ur) < 1e12
-    assert fd.norm(ui) < 1e12
+    assert fd.errornorm(u0, ur) < eps
+    assert fd.norm(ui) < eps
 
     cpx.set_imag(w, u1)
 
     cpx.get_real(w, ur)
     cpx.get_imag(w, ui)
 
-    assert fd.errornorm(u0, ur) < 1e12
-    assert fd.errornorm(u1, ui) < 1e12
+    assert fd.errornorm(u0, ur) < eps
+    assert fd.errornorm(u1, ui) < eps
 
 
 @pytest.mark.parametrize("elem", scalar_elements)

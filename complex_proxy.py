@@ -150,17 +150,21 @@ def _part_generator(u, i):
     :arg u: a complex Function.
     :arg i: the index of the components, Part.Real for real or Part.Imag for imaginary.
     """
-    elem = u.ufl_element()
+    # elem = u.ufl_element()
 
-    if isinstance(elem, fd.TensorElement):
-        num_sub_real = elem.num_sub_elements()//2
-        return (u.sub(i*num_sub_real + j) for j in range(num_sub_real))
+    # if isinstance(elem, fd.TensorElement):
+    #     num_sub_real = elem.num_sub_elements()//2
+    #     return (u.sub(i*num_sub_real + j) for j in range(num_sub_real))
 
-    elif isinstance(elem, fd.VectorElement):
-        return (u.sub(i),)
+    # elif isinstance(elem, fd.VectorElement):
+    #     return (u.sub(i),)
 
-    else:
-        raise ValueError("u must be a function from a complex-proxy FunctionSpace")
+    us = u.split()
+    vlen = len(us)//2
+    return ((us[2*j+i] for j in range(vlen)))
+
+    #else:
+    #    raise ValueError("u must be a function from a complex-proxy FunctionSpace")
 
 
 def _get_part(u, vout, i):
@@ -177,9 +181,12 @@ def _get_part(u, vout, i):
     if not compatible_ufl_elements(u.ufl_element(), vout.ufl_element()):
         raise ValueError("u and vout must be Functions from the complex and real FunctionSpaces")
 
-    for q, p in zip(u.split(), vout.split()):
-        for j, part in enumerate(_part_generator(q, i)):
-            p.sub(j).assign(part)
+    for q, p in zip(_part_generator(u, i), vout.split()):
+        p.assign(p)
+
+    #for q, p in zip(u.split(), vout.split()):
+    #    for j, part in enumerate(_part_generator(q, i)):
+    #        p.sub(j).assign(part)
 
     return vout
 
@@ -198,9 +205,12 @@ def _set_part(u, vnew, i):
     if not compatible_ufl_elements(u.ufl_element(), vnew.ufl_element()):
         raise ValueError("u and vnew must be Functions from the complex and real FunctionSpaces")
 
-    for q, p in zip(u.split(), vnew.split()):
-        for j, part in enumerate(_part_generator(q, i)):
-            part.assign(p.sub(j))
+    for q, p in zip(_part_generator(u, i), vnew.split()):
+        q.assign(p)
+
+    # for q, p in zip(u.split(), vnew.split()):
+    #     for j, part in enumerate(_part_generator(q, i)):
+    #         part.assign(p.sub(j))
 
 
 def LinearForm(W, z, f):
