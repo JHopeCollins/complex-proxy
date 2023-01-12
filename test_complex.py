@@ -102,12 +102,14 @@ def test_mixed_function_space(mesh, mixed_element):
         assert imag_elem == orig_elem
 
 
-@pytest.mark.parametrize("elem", scalar_elements) #+vector_elements)
+@pytest.mark.parametrize("elem", scalar_elements+vector_elements)
 def test_set_get_part(mesh, elem):
     """
-    Test that the real and imaginary parts are set and get correctly for scalar real FunctionSpace
+    Test that the real and imaginary parts are set and get correctly from/to real FunctionSpace
+
+    TODO: add tests for tensor_elements
     """
-    eps = 1e-8
+    eps = 1e-12
 
     x, y = fd.SpatialCoordinate(mesh)
 
@@ -151,12 +153,14 @@ def test_set_get_part(mesh, elem):
     assert fd.errornorm(u1, ui) < eps
 
 
-@pytest.mark.parametrize("elem", scalar_elements)
+@pytest.mark.parametrize("elem", scalar_elements+vector_elements)
 @pytest.mark.parametrize("z", complex_numbers)
 def test_linear_form(mesh, elem, z):
     """
     Test that the linear Form is constructed correctly
     """
+    eps = 1e-12
+
     V = fd.FunctionSpace(mesh, elem)
     W = cpx.FunctionSpace(V)
 
@@ -164,7 +168,9 @@ def test_linear_form(mesh, elem, z):
 
     f = x*x-y
     if elem.reference_value_shape() != ():
-        f = fd.as_vector([x*x-y, y+x])
+        vec_expr = [x*x-y, y+x, -y-0.5*x]
+        dim = elem.reference_value_shape()[0]
+        f = fd.as_vector(vec_expr[:dim])
     else:
         f = x*x-y
 
@@ -178,16 +184,15 @@ def test_linear_form(mesh, elem, z):
     ui = fd.Function(V)
     w = fd.Function(W)
 
-    fd.assemble(cpx.LinearForm(W, z, L),
-                tensor=w)
+    w = fd.assemble(cpx.LinearForm(W, z, L))
 
     cpx.get_real(w, ur)
     cpx.get_imag(w, ui)
 
     zr = z.real
     zi = z.imag
-    assert fd.errornorm(zr*rhs, ur) < 1e-12
-    assert fd.errornorm(zi*rhs, ui) < 1e-12
+    assert fd.errornorm(zr*rhs, ur) < eps
+    assert fd.errornorm(zi*rhs, ui) < eps
 
 
 def test_bilinear_form(mesh):

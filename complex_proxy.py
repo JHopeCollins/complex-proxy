@@ -83,18 +83,36 @@ def split(u, i):
         raise ValueError("i must be a Part enum")
 
     us = fd.split(u)
+    vlen = len(us)//2
+    return tuple((us[2*j+i] for j in range(vlen)))
 
-    ncomponents = len(u.function_space().split())
+    #ncomponents = len(u.function_space().split())
 
-    if ncomponents == 1:
-        return tuple((us[i],))
+    #if ncomponents == 1:
+    #    return tuple((us[i],))
 
-    def get_sub_element(cpt, i):
-        part = us[cpt]
-        idxs = fd.indices(len(part.ufl_shape) - 1)
-        return fd.as_tensor(Indexed(part, MultiIndex((FixedIndex(i), *idxs))), idxs)
+    #def get_sub_element(cpt, i):
+    #    part = us[cpt]
+    #    idxs = fd.indices(len(part.ufl_shape) - 1)
+    #    return fd.as_tensor(Indexed(part, MultiIndex((FixedIndex(i), *idxs))), idxs)
 
-    return tuple(get_sub_element(cpt, i) for cpt in range(ncomponents))
+    #return tuple(get_sub_element(cpt, i) for cpt in range(ncomponents))
+
+
+def subfunctions(u, i):
+    """
+    Return a tuple of the real or imaginary components of the complex function u.
+    Analogous to u.split() (which will be renamed u.subfunctions() at some point).
+
+    :arg u: a complex Function.
+    :arg i: the index of the components, Part.Real for real or Part.Imag for imaginary.
+    """
+    if not isinstance(i, Part):
+        raise ValueError("i must be a Part enum")
+
+    us = u.split()
+    vlen = len(us)//2
+    return tuple((us[2*j+i] for j in range(vlen)))
 
 
 def get_real(u, vout, name=None):
@@ -143,30 +161,6 @@ def set_imag(u, vnew):
     _set_part(u, vnew, Part.Imag)
 
 
-def _part_generator(u, i):
-    """
-    Return a tuple of the real or imaginary components of the complex function u.
-
-    :arg u: a complex Function.
-    :arg i: the index of the components, Part.Real for real or Part.Imag for imaginary.
-    """
-    # elem = u.ufl_element()
-
-    # if isinstance(elem, fd.TensorElement):
-    #     num_sub_real = elem.num_sub_elements()//2
-    #     return (u.sub(i*num_sub_real + j) for j in range(num_sub_real))
-
-    # elif isinstance(elem, fd.VectorElement):
-    #     return (u.sub(i),)
-
-    us = u.split()
-    vlen = len(us)//2
-    return ((us[2*j+i] for j in range(vlen)))
-
-    #else:
-    #    raise ValueError("u must be a function from a complex-proxy FunctionSpace")
-
-
 def _get_part(u, vout, i):
     """
     Get the real or imaginary part of the complex Function u and copy it to real Function vout.
@@ -181,12 +175,8 @@ def _get_part(u, vout, i):
     if not compatible_ufl_elements(u.ufl_element(), vout.ufl_element()):
         raise ValueError("u and vout must be Functions from the complex and real FunctionSpaces")
 
-    for q, p in zip(_part_generator(u, i), vout.split()):
-        p.assign(p)
-
-    #for q, p in zip(u.split(), vout.split()):
-    #    for j, part in enumerate(_part_generator(q, i)):
-    #        p.sub(j).assign(part)
+    for q, p in zip(subfunctions(u, i), vout.split()):
+        p.assign(q)
 
     return vout
 
@@ -205,21 +195,15 @@ def _set_part(u, vnew, i):
     if not compatible_ufl_elements(u.ufl_element(), vnew.ufl_element()):
         raise ValueError("u and vnew must be Functions from the complex and real FunctionSpaces")
 
-    for q, p in zip(_part_generator(u, i), vnew.split()):
+    for q, p in zip(subfunctions(u, i), vnew.split()):
         q.assign(p)
-
-    # for q, p in zip(u.split(), vnew.split()):
-    #     for j, part in enumerate(_part_generator(q, i)):
-    #         part.assign(p.sub(j))
 
 
 def LinearForm(W, z, f):
     """
     Return a Linear Form on the complex FunctionSpace W equal to a complex multiple of a linear Form on the real FunctionSpace.
-    If z = zr + i*zi is a complex number, v = vr + i*vi is a complex TestFunction, we want to construct a Form <v,zf>
-
-    <v,zf> = <(vr + i*vi),(zr + i*zi)f>
-           = <zr*vr,f> + i<zi*vi,f>
+    If z = zr + i*zi is a complex number, v = vr + i*vi is a complex TestFunction, we want to construct the Form:
+    <zr*vr,f> + i<zi*vi,f>
 
     :arg W: the complex-proxy FunctionSpace
     :arg z: a complex number.
