@@ -158,6 +158,8 @@ def test_set_get_part(mesh, elem):
 def test_linear_form(mesh, elem, z):
     """
     Test that the linear Form is constructed correctly
+
+    TODO: add tests for tensor_elements
     """
     eps = 1e-12
 
@@ -166,7 +168,6 @@ def test_linear_form(mesh, elem, z):
 
     x, y = fd.SpatialCoordinate(mesh)
 
-    f = x*x-y
     if elem.reference_value_shape() != ():
         vec_expr = [x*x-y, y+x, -y-0.5*x]
         dim = elem.reference_value_shape()[0]
@@ -195,18 +196,31 @@ def test_linear_form(mesh, elem, z):
     assert fd.errornorm(zi*rhs, ui) < eps
 
 
-def test_bilinear_form(mesh):
+@pytest.mark.parametrize("elem", scalar_elements+vector_elements)
+def test_bilinear_form(mesh, elem):
     """
     Test that the bilinear form is constructed correctly
+
+    TODO: add tests for tensor_elements
     """
-    V = fd.FunctionSpace(mesh, "CG", 1)
-    W = cpx.FunctionSpace(V)
+    eps = 1e-12
+
+    # set up the real problem
+    V = fd.FunctionSpace(mesh, elem)
 
     x, y = fd.SpatialCoordinate(mesh)
-    f = fd.Function(V).interpolate(x*x-y)
+
+    if elem.reference_value_shape() != ():
+        vec_expr = [x*x-y, y+x, -y-0.5*x]
+        dim = elem.reference_value_shape()[0]
+        expr = fd.as_vector(vec_expr[:dim])
+    else:
+        expr = x*x-y
+
+    f = fd.Function(V).interpolate(expr)
 
     def form_function(u, v):
-        return fd.inner(fd.grad(u), fd.grad(v))*fd.dx
+        return fd.inner(u, v)*fd.dx
 
     u = fd.TrialFunction(V)
     v = fd.TestFunction(V)
@@ -216,7 +230,9 @@ def test_bilinear_form(mesh):
     # the real value
     b = fd.assemble(fd.action(a, f))
 
-    # complex vector to multiply
+    # set up the complex problem
+    W = cpx.FunctionSpace(V)
+
     g = fd.Function(W)
 
     cpx.set_real(g, f)
@@ -237,8 +253,8 @@ def test_bilinear_form(mesh):
     cpx.get_real(wr, br)
     cpx.get_imag(wr, bi)
 
-    assert fd.errornorm(3*1*b, br) < 1e-12
-    assert fd.errornorm(3*2*b, bi) < 1e-12
+    assert fd.errornorm(3*1*b, br) < eps
+    assert fd.errornorm(3*2*b, bi) < eps
 
     # non-zero only on off-diagonal blocks: real and imag parts independent
     zi = 0+4j
