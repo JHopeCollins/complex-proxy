@@ -43,7 +43,7 @@ def mixed_element():
     return fd.MixedElement([param.values[0] for param in elements])
 
 
-@pytest.mark.parametrize("elem", scalar_elements)
+@pytest.mark.parametrize("elem", elements)
 def test_finite_element(elem):
     """
     Test that the complex proxy FiniteElement is constructed correctly from a real FiniteElement.
@@ -54,36 +54,6 @@ def test_finite_element(elem):
 
     for ce in celem.sub_elements():
         assert ce == elem
-
-
-@pytest.mark.parametrize("elem", vector_elements)
-def test_vector_element(elem):
-    """
-    Test that the complex proxy FiniteElement is constructed correctly from a real VectorElement.
-    """
-    celem = cpx.FiniteElement(elem)
-
-    assert celem.num_sub_elements() == 2*elem.num_sub_elements()
-
-    assert celem._shape == (2, elem.num_sub_elements())
-
-    for ce in celem.sub_elements():
-        assert ce == elem.sub_elements()[0]
-
-
-@pytest.mark.parametrize("elem", tensor_elements)
-def test_tensor_element(elem):
-    """
-    Test that the complex proxy FiniteElement is constructed correctly from a real TensorElement.
-    """
-    celem = cpx.FiniteElement(elem)
-
-    assert celem.num_sub_elements() == 2*elem.num_sub_elements()
-
-    assert celem._shape == (2,) + elem._shape
-
-    for ce in celem.sub_elements():
-        assert ce == elem.sub_elements()[0]
 
 
 def test_mixed_element(mixed_element):
@@ -118,10 +88,18 @@ def test_mixed_function_space(mesh, mixed_element):
     V = fd.FunctionSpace(mesh, mixed_element)
     W = cpx.FunctionSpace(V)
 
-    assert len(W.split()) == len(V.split())
+    assert len(W.split()) == 2*len(V.split())
 
-    for wcpt, vcpt in zip(W.split(), V.split()):
-        assert wcpt == cpx.FunctionSpace(vcpt)
+    for i in range(V.ufl_element().num_sub_elements()):
+        idx_real = 2*i+0
+        idx_imag = 2*i+1
+
+        real_elem = W.split()[idx_real].ufl_element()
+        imag_elem = W.split()[idx_imag].ufl_element()
+        orig_elem = V.split()[i].ufl_element()
+
+        assert real_elem == orig_elem
+        assert imag_elem == orig_elem
 
 
 @pytest.mark.parametrize("elem", scalar_elements+vector_elements)
