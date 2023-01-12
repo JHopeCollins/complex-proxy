@@ -1,8 +1,6 @@
 
 import firedrake as fd
 
-from ufl.classes import MultiIndex, FixedIndex, Indexed
-
 from enum import IntEnum
 
 # flags for real and imaginary parts
@@ -85,18 +83,6 @@ def split(u, i):
     us = fd.split(u)
     vlen = len(us)//2
     return tuple((us[2*j+i] for j in range(vlen)))
-
-    #ncomponents = len(u.function_space().split())
-
-    #if ncomponents == 1:
-    #    return tuple((us[i],))
-
-    #def get_sub_element(cpt, i):
-    #    part = us[cpt]
-    #    idxs = fd.indices(len(part.ufl_shape) - 1)
-    #    return fd.as_tensor(Indexed(part, MultiIndex((FixedIndex(i), *idxs))), idxs)
-
-    #return tuple(get_sub_element(cpt, i) for cpt in range(ncomponents))
 
 
 def subfunctions(u, i):
