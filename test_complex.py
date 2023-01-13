@@ -43,7 +43,7 @@ def mixed_element():
     return fd.MixedElement([param.values[0] for param in elements])
 
 
-@pytest.mark.parametrize("elem", scalar_elements)
+@pytest.mark.parametrize("elem", elements)
 def test_finite_element(elem):
     """
     Test that the complex proxy FiniteElement is constructed correctly from a real FiniteElement.
@@ -54,36 +54,6 @@ def test_finite_element(elem):
 
     for ce in celem.sub_elements():
         assert ce == elem
-
-
-@pytest.mark.parametrize("elem", vector_elements)
-def test_vector_element(elem):
-    """
-    Test that the complex proxy FiniteElement is constructed correctly from a real VectorElement.
-    """
-    celem = cpx.FiniteElement(elem)
-
-    assert celem.num_sub_elements() == 2*elem.num_sub_elements()
-
-    assert celem._shape == (2, elem.num_sub_elements())
-
-    for ce in celem.sub_elements():
-        assert ce == elem.sub_elements()[0]
-
-
-@pytest.mark.parametrize("elem", tensor_elements)
-def test_tensor_element(elem):
-    """
-    Test that the complex proxy FiniteElement is constructed correctly from a real TensorElement.
-    """
-    celem = cpx.FiniteElement(elem)
-
-    assert celem.num_sub_elements() == 2*elem.num_sub_elements()
-
-    assert celem._shape == (2,) + elem._shape
-
-    for ce in celem.sub_elements():
-        assert ce == elem.sub_elements()[0]
 
 
 def test_mixed_element(mixed_element):
@@ -118,17 +88,29 @@ def test_mixed_function_space(mesh, mixed_element):
     V = fd.FunctionSpace(mesh, mixed_element)
     W = cpx.FunctionSpace(V)
 
-    assert len(W.split()) == len(V.split())
+    assert len(W.split()) == 2*len(V.split())
 
-    for wcpt, vcpt in zip(W.split(), V.split()):
-        assert wcpt == cpx.FunctionSpace(vcpt)
+    for i in range(V.ufl_element().num_sub_elements()):
+        idx_real = 2*i+0
+        idx_imag = 2*i+1
+
+        real_elem = W.split()[idx_real].ufl_element()
+        imag_elem = W.split()[idx_imag].ufl_element()
+        orig_elem = V.split()[i].ufl_element()
+
+        assert real_elem == orig_elem
+        assert imag_elem == orig_elem
 
 
 @pytest.mark.parametrize("elem", scalar_elements+vector_elements)
 def test_set_get_part(mesh, elem):
     """
-    Test that the real and imaginary parts are set and get correctly for scalar real FunctionSpace
+    Test that the real and imaginary parts are set and get correctly from/to real FunctionSpace
+
+    TODO: add tests for tensor_elements
     """
+    eps = 1e-12
+
     x, y = fd.SpatialCoordinate(mesh)
 
     if elem.reference_value_shape() != ():
@@ -151,40 +133,45 @@ def test_set_get_part(mesh, elem):
     cpx.get_real(w, ur)
     cpx.get_imag(w, ui)
 
-    assert fd.norm(ur) < 1e12
-    assert fd.norm(ui) < 1e12
+    assert fd.norm(ur) < eps
+    assert fd.norm(ui) < eps
 
     cpx.set_real(w, u0)
 
     cpx.get_real(w, ur)
     cpx.get_imag(w, ui)
 
-    assert fd.errornorm(u0, ur) < 1e12
-    assert fd.norm(ui) < 1e12
+    assert fd.errornorm(u0, ur) < eps
+    assert fd.norm(ui) < eps
 
     cpx.set_imag(w, u1)
 
     cpx.get_real(w, ur)
     cpx.get_imag(w, ui)
 
-    assert fd.errornorm(u0, ur) < 1e12
-    assert fd.errornorm(u1, ui) < 1e12
+    assert fd.errornorm(u0, ur) < eps
+    assert fd.errornorm(u1, ui) < eps
 
 
-@pytest.mark.parametrize("elem", scalar_elements)
+@pytest.mark.parametrize("elem", scalar_elements+vector_elements)
 @pytest.mark.parametrize("z", complex_numbers)
 def test_linear_form(mesh, elem, z):
     """
     Test that the linear Form is constructed correctly
+
+    TODO: add tests for tensor_elements
     """
+    eps = 1e-12
+
     V = fd.FunctionSpace(mesh, elem)
     W = cpx.FunctionSpace(V)
 
     x, y = fd.SpatialCoordinate(mesh)
 
-    f = x*x-y
     if elem.reference_value_shape() != ():
-        f = fd.as_vector([x*x-y, y+x])
+        vec_expr = [x*x-y, y+x, -y-0.5*x]
+        dim = elem.reference_value_shape()[0]
+        f = fd.as_vector(vec_expr[:dim])
     else:
         f = x*x-y
 
@@ -198,30 +185,42 @@ def test_linear_form(mesh, elem, z):
     ui = fd.Function(V)
     w = fd.Function(W)
 
-    fd.assemble(cpx.LinearForm(W, z, L),
-                tensor=w)
+    w = fd.assemble(cpx.LinearForm(W, z, L))
 
     cpx.get_real(w, ur)
     cpx.get_imag(w, ui)
 
     zr = z.real
     zi = z.imag
-    assert fd.errornorm(zr*rhs, ur) < 1e-12
-    assert fd.errornorm(zi*rhs, ui) < 1e-12
+    assert fd.errornorm(zr*rhs, ur) < eps
+    assert fd.errornorm(zi*rhs, ui) < eps
 
 
-def test_bilinear_form(mesh):
+@pytest.mark.parametrize("elem", scalar_elements+vector_elements)
+def test_bilinear_form(mesh, elem):
     """
     Test that the bilinear form is constructed correctly
+
+    TODO: add tests for tensor_elements
     """
-    V = fd.FunctionSpace(mesh, "CG", 1)
-    W = cpx.FunctionSpace(V)
+    eps = 1e-12
+
+    # set up the real problem
+    V = fd.FunctionSpace(mesh, elem)
 
     x, y = fd.SpatialCoordinate(mesh)
-    f = fd.Function(V).interpolate(x*x-y)
+
+    if elem.reference_value_shape() != ():
+        vec_expr = [x*x-y, y+x, -y-0.5*x]
+        dim = elem.reference_value_shape()[0]
+        expr = fd.as_vector(vec_expr[:dim])
+    else:
+        expr = x*x-y
+
+    f = fd.Function(V).interpolate(expr)
 
     def form_function(u, v):
-        return fd.inner(fd.grad(u), fd.grad(v))*fd.dx
+        return fd.inner(u, v)*fd.dx
 
     u = fd.TrialFunction(V)
     v = fd.TestFunction(V)
@@ -231,7 +230,9 @@ def test_bilinear_form(mesh):
     # the real value
     b = fd.assemble(fd.action(a, f))
 
-    # complex vector to multiply
+    # set up the complex problem
+    W = cpx.FunctionSpace(V)
+
     g = fd.Function(W)
 
     cpx.set_real(g, f)
@@ -252,8 +253,8 @@ def test_bilinear_form(mesh):
     cpx.get_real(wr, br)
     cpx.get_imag(wr, bi)
 
-    assert fd.errornorm(3*1*b, br) < 1e-12
-    assert fd.errornorm(3*2*b, bi) < 1e-12
+    assert fd.errornorm(3*1*b, br) < eps
+    assert fd.errornorm(3*2*b, bi) < eps
 
     # non-zero only on off-diagonal blocks: real and imag parts independent
     zi = 0+4j

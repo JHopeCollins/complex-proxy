@@ -1,9 +1,12 @@
 
 import firedrake as fd
 
-from ufl.classes import MultiIndex, FixedIndex, Indexed
-
 from enum import IntEnum
+
+__all__ = ["FiniteElement", "FunctionSpace", "DirichletBC",
+           "split", "subfunctions", "get_real", "get_imag", "set_real", "set_imag",
+           "LinearForm", "BilinearForm", "derivative",
+           "Part", "re", "im"]
 
 # flags for real and imaginary parts
 Part = IntEnum("Part", (("Real", 0), ("Imag", 1)))
@@ -32,21 +35,10 @@ def FiniteElement(elem):
 
     :arg elem: the UFL FiniteElement to be proxied
     """
-    if isinstance(elem, fd.TensorElement):
-        shape = (2,) + elem._shape
-        scalar_element = elem.sub_elements()[0]
-        return fd.TensorElement(scalar_element, shape=shape)
-
-    elif isinstance(elem, fd.VectorElement):
-        shape = (2, elem.num_sub_elements())
-        scalar_element = elem.sub_elements()[0]
-        return fd.TensorElement(scalar_element, shape=shape)
-
-    elif isinstance(elem, fd.MixedElement):  # recurse
+    if type(elem) is fd.MixedElement:
         return fd.MixedElement([FiniteElement(e) for e in elem.sub_elements()])
-
     else:
-        return fd.VectorElement(elem, dim=2)
+        return fd.MixedElement([elem, elem])
 
 
 def FunctionSpace(V):
@@ -74,31 +66,73 @@ def DirichletBC(W, V, bc):
     pass
 
 
+def _component_elements(us, i):
+    """
+    Return a tuple of the real or imaginary elements of the iterable us
+
+    :arg us: an iterable having the same number of elements as the complex function space
+                i.e. twice the number of components as the real function space.
+    :arg i: the index of the components, Part.Real for real or Part.Imag for imaginary.
+    """
+    if not isinstance(i, Part):
+        raise ValueError("i must be a Part enum")
+    return tuple((us[2*j+i] for j in range(len(us)//2)))
+
+
 def split(u, i):
     """
     If u is a Coefficient or Argument in the complex FunctionSpace,
         returns a tuple with the function components corresponding
         to the real or imaginary subelements, indexed appropriately.
+        Analogous to firedrake.split(u)
 
     :arg u: a Coefficient or Argument in the complex FunctionSpace
     :arg i: Part.Real for real subelements, Part.Imag for imaginary elements
     """
-    if not isinstance(i, Part):
-        raise ValueError("i must be a Part enum")
+    return _component_elements(fd.split(u), i)
 
-    us = fd.split(u)
 
-    ncomponents = len(u.function_space().split())
+def subfunctions(u, i):
+    """
+    Return a tuple of the real or imaginary components of the complex function u.
+    Analogous to u.split() (which will be renamed u.subfunctions() at some point).
 
-    if ncomponents == 1:
-        return tuple((us[i],))
+    :arg u: a complex Function.
+    :arg i: the index of the components, Part.Real for real or Part.Imag for imaginary.
+    """
+    return _component_elements(u.split(), i)
 
-    def get_sub_element(cpt, i):
-        part = us[cpt]
-        idxs = fd.indices(len(part.ufl_shape) - 1)
-        return fd.as_tensor(Indexed(part, MultiIndex((FixedIndex(i), *idxs))), idxs)
 
-    return tuple(get_sub_element(cpt, i) for cpt in range(ncomponents))
+def _get_part(u, vout, i):
+    """
+    Get the real or imaginary part of the complex Function u and copy it to real Function vout.
+
+    :arg u: a complex Function.
+    :arg vout: a real Function.
+    :arg i: the index of the components, Part.Real for real or Part.Imag for imaginary.
+    """
+    if not compatible_ufl_elements(u.ufl_element(), vout.ufl_element()):
+        raise ValueError("u and vout must be Functions from the complex and real FunctionSpaces")
+
+    for q, p in zip(subfunctions(u, i), vout.split()):
+        p.assign(q)
+
+    return vout
+
+
+def _set_part(u, vnew, i):
+    """
+    Set the real or imaginary part of the complex Function u to the value of the real Function vnew.
+
+    :arg u: a complex Function.
+    :arg vnew: a real Function.
+    :arg i: the index of the components, Part.Real for real or Part.Imag for imaginary.
+    """
+    if not compatible_ufl_elements(u.ufl_element(), vnew.ufl_element()):
+        raise ValueError("u and vnew must be Functions from the complex and real FunctionSpaces")
+
+    for q, p in zip(subfunctions(u, i), vnew.split()):
+        q.assign(p)
 
 
 def get_real(u, vout, name=None):
@@ -147,73 +181,11 @@ def set_imag(u, vnew):
     _set_part(u, vnew, Part.Imag)
 
 
-def _part_generator(u, i):
-    """
-    Return a tuple of the real or imaginary components of the complex function u.
-
-    :arg u: a complex Function.
-    :arg i: the index of the components, Part.Real for real or Part.Imag for imaginary.
-    """
-    elem = u.ufl_element()
-
-    if isinstance(elem, fd.TensorElement):
-        num_sub_real = elem.num_sub_elements()//2
-        return (u.sub(i*num_sub_real + j) for j in range(num_sub_real))
-
-    elif isinstance(elem, fd.VectorElement):
-        return (u.sub(i),)
-
-    else:
-        raise ValueError("u must be a function from a complex-proxy FunctionSpace")
-
-
-def _get_part(u, vout, i):
-    """
-    Get the real or imaginary part of the complex Function u and copy it to real Function vout.
-
-    :arg u: a complex Function.
-    :arg vout: a real Function.
-    :arg i: the index of the components, Part.Real for real or Part.Imag for imaginary.
-    """
-    if not isinstance(i, Part):
-        raise ValueError("i must be a Part enum")
-
-    if not compatible_ufl_elements(u.ufl_element(), vout.ufl_element()):
-        raise ValueError("u and vout must be Functions from the complex and real FunctionSpaces")
-
-    for q, p in zip(u.split(), vout.split()):
-        for j, part in enumerate(_part_generator(q, i)):
-            p.sub(j).assign(part)
-
-    return vout
-
-
-def _set_part(u, vnew, i):
-    """
-    Set the real or imaginary part of the complex Function u to the value of the real Function vnew.
-
-    :arg u: a complex Function.
-    :arg vnew: a real Function.
-    :arg i: the index of the components, Part.Real for real or Part.Imag for imaginary.
-    """
-    if not isinstance(i, Part):
-        raise ValueError("i must be a Part enum")
-
-    if not compatible_ufl_elements(u.ufl_element(), vnew.ufl_element()):
-        raise ValueError("u and vnew must be Functions from the complex and real FunctionSpaces")
-
-    for q, p in zip(u.split(), vnew.split()):
-        for j, part in enumerate(_part_generator(q, i)):
-            part.assign(p.sub(j))
-
-
 def LinearForm(W, z, f):
     """
     Return a Linear Form on the complex FunctionSpace W equal to a complex multiple of a linear Form on the real FunctionSpace.
-    If z = zr + i*zi is a complex number, v = vr + i*vi is a complex TestFunction, we want to construct a Form <v,zf>
-
-    <v,zf> = <(vr + i*vi),(zr + i*zi)f>
-           = <zr*vr,f> + i<zi*vi,f>
+    If z = zr + i*zi is a complex number, v = vr + i*vi is a complex TestFunction, we want to construct the Form:
+    <zr*vr,f> + i<zi*vi,f>
 
     :arg W: the complex-proxy FunctionSpace
     :arg z: a complex number.
