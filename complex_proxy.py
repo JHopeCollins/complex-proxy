@@ -30,15 +30,8 @@ def FiniteElement(elem):
 
     :arg elem: the UFL FiniteElement to be proxied
     """
-    if isinstance(elem, fd.TensorElement):  # TensorElement is MixedElement so test first
-        return fd.MixedElement([elem, elem])
-
-    elif isinstance(elem, fd.VectorElement):  # VectorElement is MixedElement so test first
-        return fd.MixedElement([elem, elem])
-
-    elif isinstance(elem, fd.MixedElement):  # recurse
+    if type(elem) is fd.MixedElement:
         return fd.MixedElement([FiniteElement(e) for e in elem.sub_elements()])
-
     else:
         return fd.MixedElement([elem, elem])
 
