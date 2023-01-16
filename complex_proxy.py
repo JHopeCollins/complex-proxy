@@ -63,7 +63,13 @@ def DirichletBC(W, V, bc):
     :arg V: the real FunctionSpace that W was constructed from.
     :arg bc: a DirichletBC on the real FunctionSpace that W was constructed from.
     """
-    pass
+    if type(V.ufl_element()) is fd.MixedElement:
+        off = 2*bc.function_space().index
+    else:
+        off = 0
+
+    return tuple((fd.DirichletBC(W.sub(off+i), bc.function_arg, bc.sub_domain)
+                  for i in range(2)))
 
 
 def _component_elements(us, i):
