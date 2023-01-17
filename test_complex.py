@@ -63,10 +63,14 @@ def test_mixed_element(mixed_element):
 
     celem = cpx.FiniteElement(mixed_element)
 
-    assert celem.num_sub_elements() == mixed_element.num_sub_elements()
+    assert celem.num_sub_elements() == 2*mixed_element.num_sub_elements()
 
-    for csub, msub in zip(celem.sub_elements(), mixed_element.sub_elements()):
-        assert csub == cpx.FiniteElement(msub)
+    csubs = celem.sub_elements()
+    msubs = mixed_element.sub_elements()
+
+    for i in range(mixed_element.num_sub_elements()):
+        assert csubs[2*i+0] == msubs[i]
+        assert csubs[2*i+1] == msubs[i]
 
 
 @pytest.mark.parametrize("elem", elements)
