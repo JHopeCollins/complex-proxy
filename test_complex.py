@@ -445,3 +445,103 @@ def test_linear_solve(mesh, bc_type):
     fd.solve(a == g, ui, bcs=bcs)
 
     assert fd.errornorm(ui, wchecki)
+
+
+@pytest.mark.parametrize("bc_type", ["nobc", "dirichletbc"])
+def test_mixed_linear_solve(mesh, bc_type):
+    """
+    Test that the bilinear form is constructed correctly
+
+    TODO: add tests for tensor_elements
+    """
+    from math import pi
+
+    eps = 1e-12
+
+    # set up the real problem
+    V0 = fd.FunctionSpace(mesh, "BDM", 1)
+    V1 = fd.FunctionSpace(mesh, "DG", 0)
+    V = V0*V1
+
+    x, y = fd.SpatialCoordinate(mesh)
+
+    def form_function(sigma, u, tau, v):
+        return (fd.dot(sigma, tau) + fd.div(tau)*u + fd.div(sigma)*v)*fd.dx
+
+    def rhs(tau, v):
+        f = 10*fd.exp(-(pow(x - 0.5, 2) + pow(y - 0.5, 2)) / 0.02)
+        return -fd.inner(f, v)*fd.dx
+
+    if bc_type == "nobc":
+        bcs = []
+    elif bc_type == "dirichletbc":
+        bcs = [
+            fd.DirichletBC(V.sub(1), 0, 3),
+            fd.DirichletBC(V.sub(1), 0, 4)
+        ]
+    else:
+        raise ValueError(f"Unrecognised boundary condition type: {bc_type}")
+
+    # the real solution
+    u = fd.TrialFunctions(V)
+    v = fd.TestFunctions(V)
+    A = form_function(*u, *v)
+    L = rhs(*v)
+
+    ureal = fd.Function(V)
+    fd.solve(A == L, ureal, bcs=bcs)
+
+    # set up the complex problem
+    W = cpx.FunctionSpace(V)
+
+    cpx_bcs = []
+    for bc in bcs:
+        cpx_bcs.extend([*cpx.DirichletBC(W, V, bc)])
+
+    # A non-zero only on diagonal blocks: real and imag parts independent
+    zr = 3+0j
+    zl = 1+2j
+
+    A = cpx.BilinearForm(W, zr, form_function)
+    L = cpx.LinearForm(W, zl, rhs)
+
+    wr = fd.Function(W)
+
+    fd.solve(A == L, wr, bcs=cpx_bcs)
+
+    wcheckr = fd.Function(V)
+    wchecki = fd.Function(V)
+
+    cpx.get_real(wr, wcheckr)
+    cpx.get_imag(wr, wchecki)
+
+    assert fd.errornorm(1*ureal/3, wcheckr) < eps
+    assert fd.errornorm(2*ureal/3, wchecki) < eps
+
+    # non-zero on all blocks but imag part of rhs is zero
+    zi = 2+4j
+
+    A = cpx.BilinearForm(W, zi, form_function)
+    L = cpx.LinearForm(W, 1, rhs)
+
+    wi = fd.Function(W)
+
+    fd.solve(A == L, wi, bcs=cpx_bcs)
+
+    cpx.get_real(wi, wcheckr)
+    cpx.get_imag(wi, wchecki)
+
+    sigma = fd.TrialFunctions(W)
+    tau = fd.TestFunctions(W)
+
+    # eliminate imaginary part to check real part
+    assert fd.errornorm(2*ureal/(2*2+4*4), wcheckr) < 1e-12
+
+    # back substitute real part to check imaginary part
+    g = 0.25*(2*fd.action(form_function(*u, *v), wcheckr) - rhs(*v))
+    a = form_function(*u, *v)
+
+    ui = fd.Function(V)
+    fd.solve(a == g, ui, bcs=bcs)
+
+    assert fd.errornorm(ui, wchecki)

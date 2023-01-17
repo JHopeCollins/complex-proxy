@@ -18,11 +18,15 @@ def compatible_ufl_elements(elemc, elemr):
     """
     Return whether the ufl element elemc is a complex proxy for real ufl element elemr
 
+    TODO: This will currently always evaluate to true if the real element is a MixedElement to avoid the fact that fd.FunctionSpace flattens nested MixedElements. This needs to be fixed.
+
     :arg elemc: complex proxy ufl element
     :arg elemr: real ufl element
     """
-    #return elemc == FiniteElement(elemr)
-    return True
+    if type(elemr) is fd.MixedElement:
+        return True
+    else:
+        return elemc == FiniteElement(elemr)
 
 
 def FiniteElement(elem):
