@@ -25,4 +25,4 @@ print(f"elem2.num_sub_element(): {elem2.num_sub_elements()}")
 print(f"elem22.num_sub_element(): {elem22.num_sub_elements()}")
 print(f"fs22.ufl_element().num_sub_element(): {fs22.ufl_element().num_sub_elements()}")
 
-assert fs22.ufl_element() != elem22 # passes
+assert fs22.ufl_element() != elem22  # passes

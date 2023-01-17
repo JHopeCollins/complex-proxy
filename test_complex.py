@@ -454,8 +454,6 @@ def test_mixed_linear_solve(mesh, bc_type):
 
     TODO: add tests for tensor_elements
     """
-    from math import pi
-
     eps = 1e-12
 
     # set up the real problem
@@ -530,9 +528,6 @@ def test_mixed_linear_solve(mesh, bc_type):
 
     cpx.get_real(wi, wcheckr)
     cpx.get_imag(wi, wchecki)
-
-    sigma = fd.TrialFunctions(W)
-    tau = fd.TestFunctions(W)
 
     # eliminate imaginary part to check real part
     assert fd.errornorm(2*ureal/(2*2+4*4), wcheckr) < 1e-12
