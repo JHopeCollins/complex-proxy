@@ -258,10 +258,43 @@ def NonlinearForm(z, F):
 
 def derivative(z, F, u):
     """
-    Return a bilinear Form equivalent to z*J if J=dF/du is the derivative of the nonlinear Form F with respect to the complex Function u
+    Return a bilinear Form equivalent to z*J where z is a complex number, J = dF/dw, F is a nonlinear Form on the real-valued space, and w is a function in the real-valued space. The real and imaginary components of the complex function u most both be equal to w for this operation to be valid.
+
+    If z = zr + i*zi is a complex number, x = xr + i*xi is a complex Function, b = br + i*bi is a complex linear Form, J is the bilinear Form dF/dw, we want to construct a Form such that (zJ)x=b
+
+    (zJ)x = (zr*J + i*zi*J)(xr + i*xi)
+          = (zr*J*xr - zi*J*xi) + i*(zr*A*xi + zi*A*xr)
+
+          = | zr*J   -zi*J | | xr | = | br |
+            |              | |    |   |    |
+            | zi*J    zr*J | | xi | = | bi |
 
     :arg z: a complex number.
     :arg F: a generator function for a nonlinear Form on the real FunctionSpace, callable as F(*u, *v) where u and v are Functions and TestFunctions on the real FunctionSpace.
     :arg u: the Function to differentiate F with respect to
     """
-    pass
+    W = u.function_space()
+    v = fd.TestFunction(W)
+
+    ur = split(u, Part.Real)
+    ui = split(u, Part.Imag)
+
+    vr = split(v, Part.Real)
+    vi = split(v, Part.Imag)
+
+    Frr = F(*ur, *vr)
+    Fri = F(*ur, *vi)
+    Fir = F(*ui, *vr)
+    Fii = F(*ui, *vi)
+
+    Jrr = fd.derivative(Frr, u)
+    Jri = fd.derivative(Fri, u)
+    Jir = fd.derivative(Fir, u)
+    Jii = fd.derivative(Fii, u)
+
+    A11 = z.real*Jrr
+    A12 = -z.imag*Jir
+    A21 = z.imag*Jri
+    A22 = z.real*Jii
+
+    return A11 + A12 + A21 + A22

@@ -544,3 +544,96 @@ def test_mixed_linear_solve(mesh, bc_type):
     fd.solve(a == g, ui, bcs=bcs)
 
     assert fd.errornorm(ui, wchecki)
+
+
+def test_derivative_solve(mesh):
+    """
+    Test that the bilinear form is constructed correctly
+
+    TODO: add tests for tensor_elements
+    """
+    from math import pi
+
+    eps = 1e-12
+
+    # set up the real problem
+    V = fd.FunctionSpace(mesh, "CG", 1)
+
+    x, y = fd.SpatialCoordinate(mesh)
+
+    mu = fd.Constant(0.05)
+
+    def form_function(u, v):
+        return (fd.inner(u, v) + (1 + mu*fd.inner(u, u))*fd.dot(fd.grad(u), fd.grad(v)))*fd.dx
+
+    f = (1 + 8*pi*pi)*fd.cos(2*pi*x)*fd.cos(2*pi*y)
+
+    def rhs(v):
+        return fd.inner(f, v)*fd.dx
+
+    init_expr = fd.cos(2*pi*x)*fd.cos(2*pi*y)
+
+    # the real solution
+    u = fd.Function(V).project(init_expr)
+    v = fd.TestFunction(V)
+    F = form_function(u, v)
+    A = fd.derivative(F, u)
+    L = rhs(v)
+
+    ureal = fd.Function(V)
+    fd.solve(A == L, ureal)
+
+    # set up the complex problem
+    W = cpx.FunctionSpace(V)
+
+    # linearise around "u"
+    u0 = fd.Function(W)
+    cpx.set_real(u0, u)
+    cpx.set_imag(u0, u)
+
+    # A non-zero only on diagonal blocks: real and imag parts independent
+    zr = 3+0j
+    zl = 1+2j
+
+    A = cpx.derivative(zr, form_function, u0)
+    L = cpx.LinearForm(W, zl, rhs)
+
+    wr = fd.Function(W)
+
+    fd.solve(A == L, wr)
+
+    wcheckr = fd.Function(V)
+    wchecki = fd.Function(V)
+
+    cpx.get_real(wr, wcheckr)
+    cpx.get_imag(wr, wchecki)
+
+    assert fd.errornorm(1*ureal/3, wcheckr) < eps
+    assert fd.errornorm(2*ureal/3, wchecki) < eps
+
+    # non-zero on all blocks but imag part of rhs is zero
+    zi = 2+4j
+
+    A = cpx.derivative(zi, form_function, u0)
+    L = cpx.LinearForm(W, 1, rhs)
+
+    wi = fd.Function(W)
+
+    fd.solve(A == L, wi)
+
+    cpx.get_real(wi, wcheckr)
+    cpx.get_imag(wi, wchecki)
+
+    # eliminate imaginary part to check real part
+    assert fd.errornorm(2*ureal/(2*2+4*4), wcheckr) < 1e-12
+
+    # back substitute real part to check imaginary part
+    ut = fd.Function(V).project(init_expr)
+    F = form_function(ut, v)
+    A = fd.derivative(F, ut)
+    g = 0.25*(2*fd.action(A, wcheckr) - rhs(v))
+
+    ui = fd.Function(V)
+    fd.solve(A == g, ui)
+
+    assert fd.errornorm(ui, wchecki)
