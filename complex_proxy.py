@@ -84,7 +84,7 @@ def _component_elements(us, i):
     :arg i: the index of the components, Part.Real for real or Part.Imag for imaginary.
     """
     if not isinstance(i, Part):
-        raise ValueError("i must be a Part enum")
+        raise TypeError("i must be a Part enum")
     return tuple((us[2*j+i] for j in range(len(us)//2)))
 
 
@@ -239,21 +239,6 @@ def BilinearForm(W, z, A):
     A21 = z.imag*A(*ur, *vi)
     A22 = z.real*A(*ui, *vi)
     return A11 + A12 + A21 + A22
-
-
-def NonlinearForm(z, F):
-    """
-    Return a nonlinear Form on the complex FunctionSpace equal to a complex multiple of a nonlinear Form on the real FunctionSpace
-
-    If z = zr + i*zi and u = ur + i*ui, we want to construct a Form z*F(u)
-
-    z*F(u) = (zr + i*zi)*(F(ur) + i*F(ui))
-           = (zr*F(ur) - zi*F(ui)) + i*(zr*F(ui) + zi*F(ur))
-
-    :arg z: a complex number.
-    :arg F: a generator function for a nonlinear Form on the real FunctionSpace, callable as F(*u, *v) where u and v are Functions and TestFunctions on the real FunctionSpace.
-    """
-    raise NotImplementedError("TODO: Is NonlinearForm valid for anything higher than quadratic nonlinearities?")
 
 
 def derivative(z, F, u):
