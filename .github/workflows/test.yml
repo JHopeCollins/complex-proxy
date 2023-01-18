@@ -22,6 +22,7 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as
     # part of the jobs
     steps:
+      - uses: actions/checkout@v2
       - name: Fix permissions
         # Firedrake's Dockerfile sets USER to firedrake instead of
         # using the default user, so we need to update file
@@ -30,7 +31,6 @@ jobs:
         # (copied from https://help.github.com/en/actions/migrating-to-github-actions/migrating-from-circleci-to-github-actions)
         run: |
           sudo chmod -R 777 $GITHUB_WORKSPACE /github /__w/_temp
-      - uses: actions/checkout@v2
       - name: Install test dependencies
         run: |
           . /home/firedrake/firedrake/bin/activate
