@@ -30,7 +30,7 @@ jobs:
         # (copied from https://help.github.com/en/actions/migrating-to-github-actions/migrating-from-circleci-to-github-actions)
         run: |
           sudo chmod -R 777 $GITHUB_WORKSPACE /github /__w/_temp
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v2
       - name: Install test dependencies
         run: |
           . /home/firedrake/firedrake/bin/activate
