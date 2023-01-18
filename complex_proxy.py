@@ -14,14 +14,19 @@ re = Part.Real
 im = Part.Imag
 
 
-def compatible_ufl_elements(elemc, elemr):
-    """
-    Return whether the ufl element elemc is a complex proxy for real ufl element elemr
+def _flatten_tree(root, is_leaf, get_children, container=tuple):
+    if is_leaf(root):
+        return container((root,))
+    else:
+        return container((leaf
+                          for child in get_children(root)
+                          for leaf in _flatten_tree(child, is_leaf, get_children)))
 
-    :arg elemc: complex proxy ufl element
-    :arg elemr: real ufl element
-    """
-    return elemc == FiniteElement(elemr)
+
+def _duplicate_elements(orig, dup=2):
+    return type(orig)(dup_elem
+                      for elem in orig
+                      for dup_elem in (elem for _ in range(dup)))
 
 
 def FiniteElement(elem):
@@ -35,13 +40,21 @@ def FiniteElement(elem):
 
     :arg elem: the UFL FiniteElement to be proxied
     """
-    if type(elem) is fd.MixedElement:
-        elems = []
-        for e in elem.sub_elements():
-            elems.extend([e, e])
-        return fd.MixedElement(elems)
-    else:
-        return fd.MixedElement([elem, elem])
+    flat_elem = _flatten_tree(elem,
+                              is_leaf=lambda e: type(e) is not fd.MixedElement,
+                              get_children=lambda e: e.sub_elements())
+
+    return fd.MixedElement(_duplicate_elements(flat_elem, 2))
+
+
+def compatible_ufl_elements(elemc, elemr):
+    """
+    Return whether the ufl element elemc is a complex proxy for real ufl element elemr
+
+    :arg elemc: complex proxy ufl element
+    :arg elemr: real ufl element
+    """
+    return elemc == FiniteElement(elemr)
 
 
 def FunctionSpace(V):

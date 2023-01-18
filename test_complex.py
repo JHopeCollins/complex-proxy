@@ -73,6 +73,24 @@ def test_mixed_element(mixed_element):
         assert csubs[2*i+1] == msubs[i]
 
 
+def test_nested_mixed_element():
+    """
+    Test that the complex proxy FiniteElement is constructed correctly from a nested real MixedElement.
+    """
+    cg = fd.FiniteElement("CG", cell, 1)
+    dg = fd.FiniteElement("DG", cell, 2)
+
+    mixed_elem = fd.MixedElement((cg, dg))
+    nested_elem = fd.MixedElement((mixed_elem, mixed_elem))
+    flat_elem = fd.MixedElement((cg, cg, dg, dg, cg, cg, dg, dg))
+    assert cpx.FiniteElement(nested_elem) == flat_elem
+
+    bdm = fd.FiniteElement("BDM", cell, 1)
+    nested_elem = fd.MixedElement((mixed_elem, bdm))
+    flat_elem = fd.MixedElement((cg, cg, dg, dg, bdm, bdm))
+    assert cpx.FiniteElement(nested_elem) == flat_elem
+
+
 @pytest.mark.parametrize("elem", elements)
 def test_function_space(mesh, elem):
     """
