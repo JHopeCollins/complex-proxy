@@ -217,8 +217,11 @@ def LinearForm(W, z, f):
     vr = split(v, Part.Real)
     vi = split(v, Part.Imag)
 
-    fr = z.real*f(*vr)
-    fi = z.imag*f(*vi)
+    zr = fd.Constant(z.real)
+    zi = fd.Constant(z.imag)
+
+    fr = zr*f(*vr)
+    fi = zi*f(*vi)
     return fr + fi
 
 
@@ -247,10 +250,13 @@ def BilinearForm(W, z, A):
     vr = split(v, Part.Real)
     vi = split(v, Part.Imag)
 
-    A11 = z.real*A(*ur, *vr)
-    A12 = -z.imag*A(*ui, *vr)
-    A21 = z.imag*A(*ur, *vi)
-    A22 = z.real*A(*ui, *vi)
+    zr = fd.Constant(z.real)
+    zi = fd.Constant(z.imag)
+
+    A11 = zr*A(*ur, *vr)
+    A12 = -zi*A(*ui, *vr)
+    A21 = zi*A(*ur, *vi)
+    A22 = zr*A(*ui, *vi)
     return A11 + A12 + A21 + A22
 
 
@@ -290,9 +296,12 @@ def derivative(z, F, u):
     Jir = fd.derivative(Fir, u)
     Jii = fd.derivative(Fii, u)
 
-    A11 = z.real*Jrr
-    A12 = -z.imag*Jir
-    A21 = z.imag*Jri
-    A22 = z.real*Jii
+    zr = fd.Constant(z.real)
+    zi = fd.Constant(z.imag)
+
+    A11 = zr*Jrr
+    A12 = -zi*Jir
+    A21 = zi*Jri
+    A22 = zr*Jii
 
     return A11 + A12 + A21 + A22
