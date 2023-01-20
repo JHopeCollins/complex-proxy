@@ -20,16 +20,22 @@ L = fd.inner(f, v)*fd.dx
 
 a = (fd.inner(fd.grad(u), fd.grad(v)) + fd.inner(u, v))*fd.dx
 
-#aP = (fd.inner(fd.grad(u), fd.grad(v)) + fd.inner(u, v))*fd.dx
-aP = fd.inner(fd.grad(u), fd.grad(v))*fd.dx
+aP = (fd.inner(fd.grad(u), fd.grad(v)) + fd.Constant(0.1)*fd.inner(u, v))*fd.dx
+#aP = fd.inner(fd.grad(u), fd.grad(v))*fd.dx
 #aP = fd.inner(u, v)*fd.dx
 #aP = None
 
 solver_parameters = {
     'ksp_monitor': None,
     'ksp_converged_reason': None,
-    'ksp_type': 'cg',
-    'pc_type': 'icc',
+    'ksp_type': 'fgmres',
+    'pc_type': 'ksp',
+    'ksp': {
+        'ksp_monitor': None,
+        'ksp_converged_reason': None,
+        'ksp_type': 'cg',
+        'pc_type': 'icc'
+    }
 }
 
 w = fd.Function(V)
