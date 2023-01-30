@@ -165,7 +165,7 @@ z_p = eta_p*(cos(phi_p) + sin(phi_p)*1j)
 Mc_p = cpx.BilinearForm(Wc, z_p, form_mass)
 Kc_p = cpx.BilinearForm(Wc, 1, form_function)
 
-Ac_p = Dt_r*Mc_p# + Kc_p
+Ac_p = Dt_r*Mc_p + Kc_p
 
 class ShiftPC(fd.AuxiliaryOperatorPC):
     def form(self, pc, *trials_and_tests):
@@ -184,6 +184,8 @@ solver_parameters_cp = {
     'pc_python_type': __name__+'.ShiftPC',
     'aux_pc_type': 'ksp',
     'aux_ksp': {
+        'monitor': None,
+        'converged_reason': None,
         'mat_type': 'matfree',
         'ksp_type': 'fgmres',
         'ksp_rtol': 1e-5,
