@@ -15,28 +15,9 @@ import utils.shallow_water.gravity_bumps as case
 
 from sys import exit
 
-import argparse
-parser = argparse.ArgumentParser(
-    description='Complex-valued gravity wave testcase using fully implicit linear SWE solver.',
-    formatter_class=argparse.ArgumentDefaultsHelpFormatter
-)
-
-parser.add_argument('--ref_level', type=int, default=3, help='Refinement level of icosahedral grid.')
-parser.add_argument('--dt', type=float, default=1.36, help='Timestep in hours.')
-parser.add_argument('--filename', type=str, default='gravity_waves', help='Name of output vtk files.')
-parser.add_argument('--degs', type=float, default=45, help='Angle of complex coefficient on mass matrix.')
-parser.add_argument('--patch_type', type=str, default='vanka', help='Patch type for multigrid smoother.')
-parser.add_argument('--nscales', type=int, default=6, help='Number of times to half complex coefficient.')
-parser.add_argument('--show_args', action='store_true', default=True, help='Output all the arguments.')
-
-args = parser.parse_known_args()
-args = args[0]
-
-if args.show_args:
-    PETSc.Sys.Print(args)
 # set up real case
 
-mesh = swe.create_mg_globe_mesh(ref_level=args.ref_level, coords_degree=1)
+mesh = swe.create_mg_globe_mesh(ref_level=3, coords_degree=1)
 x = fd.SpatialCoordinate(mesh)
 
 W = swe.default_function_space(mesh)
@@ -45,7 +26,7 @@ H = case.H
 g = earth.Gravity
 f = case.coriolis_expression(*x)
 
-dt = args.dt
+dt = 1.36
 dt = dt*units.hour
 
 theta = 0.5
@@ -89,7 +70,7 @@ patch_parameters = {
         'partition_of_unity': True,
         'sub_mat_type': 'seqdense',
         'construct_dim': 0,
-        'construct_type': args.patch_type,
+        'construct_type': 'star',
         'local_type': 'additive',
         'precompute_element_tensors': True,
         'symmetrise_sweep': False
@@ -121,8 +102,8 @@ solver_parameters = {
     'mat_type': 'matfree',
     'ksp_type': 'fgmres',
     'ksp': {
-        #'monitor': None,
-        #'converged_reason': None,
+        'monitor': None,
+        'converged_reason': None,
         'atol': 1e-0,
         'rtol': 1e-10,
     },
@@ -132,22 +113,18 @@ solver_parameters = {
     'mg': deepcopy(mg_parameters)
 }
 
-w1 = fd.Function(W).assign(0)
+Print("\nReal-valued solve\n")
+
+w1 = fd.Function(W)
 problem = fd.LinearVariationalProblem(A, L, w1)
 solver = fd.LinearVariationalSolver(problem, solver_parameters=solver_parameters)
 
-ofile = fd.File("output/{args.filename}.pvd")
+ofile = fd.File("swe.pvd")
 ofile.write(*w0.split(), time=0)
-
-Print("\nReal-valued solve")
 
 solver.solve()
 w0.assign(w1)
 ofile.write(*w0.split(), time=dt/units.hour)
-
-real_its = solver.snes.getLinearSolveIterations()
-
-Print(f"Real iteration count: {real_its}")
 
 # complex problem
 
@@ -163,39 +140,82 @@ from math import sin, cos, pi
 
 # complex block
 
-phi = (pi/2)*(args.degs/90)
-eta = 1.0
+#phi = deg*(2*pi)/360
+phi = (pi/2)*(60/90)
+eta = 0.025
 z = eta*(cos(phi) + sin(phi)*1j)
 
-Mc, zr, zi = cpx.BilinearForm(Wc, z, form_mass, return_z=True)
+Mc = cpx.BilinearForm(Wc, z, form_mass)
 Kc = cpx.BilinearForm(Wc, 1, form_function)
-
-zr.assign(1.5*z.real)
-zi.assign(1.5*z.imag)
 
 Ac = Dt_r*Mc + Kc
 
 Lc = fd.action(Dt_r*Mc - ((1-Theta)/Theta)*Kc, wc0)
 
+Print(f"\nComplex-valued solve:")
+Print(f"z = {z}\n")
+
 solver_parameters_c = solver_parameters
 
-wc1 = fd.Function(Wc).assign(0)
+wc1 = fd.Function(Wc)
 problem_c = fd.LinearVariationalProblem(Ac, Lc, wc1)
 solver_c = fd.LinearVariationalSolver(problem_c, solver_parameters=solver_parameters_c)
 
-Print("\nComplex-valued solves\n")
-Print(f"Complex angle: {args.degs}")
-Print(f"Patch type: {args.patch_type}\n")
+solver_c.solve()
 
-for n in range(args.nscales):
-    scale = 1/pow(2,n)
+exit()
 
-    zr.assign(scale*z.real)
-    zi.assign(scale*z.imag)
-    
-    solver_c.solve()
-    complex_its = solver_c.snes.getLinearSolveIterations()
+# shift preconditioner
 
-    Print(f"scale: {str(scale).ljust(10, ' ')} | niterations: {str(complex_its).rjust(2, ' ')}")
+phi_p = (pi/2)*(30/90)
+eta_p = 1.0*eta
+z_p = eta_p*(cos(phi_p) + sin(phi_p)*1j)
 
-    wc1.assign(0)
+Mc_p = cpx.BilinearForm(Wc, z_p, form_mass)
+Kc_p = cpx.BilinearForm(Wc, 1, form_function)
+
+Ac_p = Dt_r*Mc_p + Kc_p
+
+class ShiftPC(fd.AuxiliaryOperatorPC):
+    def form(self, pc, *trials_and_tests):
+        return self.get_appctx(pc).get("cpx_form")
+
+solver_parameters_cp = {
+    'mat_type': 'matfree',
+    'ksp_type': 'fgmres',
+    'ksp': {
+        'monitor': None,
+        'converged_reason': None,
+        'atol': 1e-0,
+        'rtol': 1e-10,
+    },
+    'pc_type': 'python',
+    'pc_python_type': __name__+'.ShiftPC',
+    'aux_pc_type': 'ksp',
+    'aux_ksp': {
+        'mat_type': 'matfree',
+        'ksp_type': 'fgmres',
+        'ksp': {
+            'monitor': None,
+            'converged_reason': None,
+            'rtol': 1e-5,
+        },
+        'pc_type': 'mg',
+        'pc_mg_cycle_type': 'v',
+        'pc_mg_type': 'multiplicative',
+        'mg': deepcopy(mg_parameters)
+    }
+}
+
+Print(f"\nShift preconditioned complex-valued solve:")
+Print(f"zp = {z_p}\n")
+
+appctx = {'cpx_form': (Ac_p, None)}
+
+wcp1 = fd.Function(Wc)
+problem_cp = fd.LinearVariationalProblem(Ac, Lc, wcp1)
+solver_cp = fd.LinearVariationalSolver(problem_cp,
+                                       solver_parameters=solver_parameters_cp,
+                                       appctx=appctx)
+
+solver_cp.solve()
