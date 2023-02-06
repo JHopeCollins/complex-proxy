@@ -2,20 +2,19 @@ import firedrake as fd
 from petsc4py import PETSc
 import complex_proxy as cpx
 
-Print = PETSc.Sys.Print
-
-import numpy as np
-from copy import deepcopy
-
 # asQ utils module
 from utils import units
 from utils.planets import earth
 from utils import shallow_water as swe
 import utils.shallow_water.gravity_bumps as case
 
-from sys import exit
-
+from math import sin, cos, pi
+from copy import deepcopy
+from sys import exit  # noqa: F401
 import argparse
+
+Print = PETSc.Sys.Print
+
 parser = argparse.ArgumentParser(
     description='Complex-valued gravity wave testcase using fully implicit linear SWE solver and shift preconditioning.',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
@@ -67,11 +66,14 @@ w0 = fd.Function(W).assign(winit)
 wtrial = fd.TrialFunction(W)
 wtest = fd.TestFunction(W)
 
+
 def form_mass(u, h, v, q):
     return swe.linear.form_mass(mesh, u, h, v, q)
 
+
 def form_function(u, h, v, q):
     return swe.linear.form_function(mesh, g, H, f, u, h, v, q)
+
 
 u, h = fd.split(wtrial)
 v, q = fd.split(wtest)
@@ -157,8 +159,6 @@ wc1 = fd.Function(Wc)
 cpx.set_real(wc0, winit)
 cpx.set_imag(wc0, winit)
 
-from math import sin, cos, pi
-
 # complex block
 
 phi = (pi/2)*(args.degs/90)
@@ -172,7 +172,7 @@ Ac = Dt_r*Mc + Kc
 
 Lc = fd.action(Dt_r*Mc - ((1-Theta)/Theta)*Kc, wc0)
 
-Print(f"\nComplex-valued solve:")
+Print("\nComplex-valued solve:")
 Print(f"z = {z}\n")
 
 solver_parameters_c = solver_parameters
@@ -194,9 +194,11 @@ Kc_p = cpx.BilinearForm(Wc, 1, form_function)
 
 Ac_p = Dt_r*Mc_p + Kc_p
 
+
 class ShiftPC(fd.AuxiliaryOperatorPC):
     def form(self, pc, *trials_and_tests):
         return self.get_appctx(pc).get("cpx_form")
+
 
 solver_parameters_cp = {
     'mat_type': 'matfree',
@@ -225,7 +227,7 @@ solver_parameters_cp = {
     }
 }
 
-Print(f"\nShift preconditioned complex-valued solve:")
+Print("\nShift preconditioned complex-valued solve:")
 Print(f"zp = {z_p}\n")
 
 appctx = {'cpx_form': (Ac_p, None)}

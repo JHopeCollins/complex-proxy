@@ -2,20 +2,20 @@ import firedrake as fd
 from petsc4py import PETSc
 import complex_proxy as cpx
 
-Print = PETSc.Sys.Print
-
-import numpy as np
-from copy import deepcopy
-
 # asQ utils module
 from utils import units
 from utils.planets import earth
 from utils import shallow_water as swe
 import utils.shallow_water.gravity_bumps as case
 
-from sys import exit
+from copy import deepcopy
+from math import sin, cos, pi
+from sys import exit  # noqa: F401
 
 import argparse
+
+Print = PETSc.Sys.Print
+
 parser = argparse.ArgumentParser(
     description='Complex-valued gravity wave testcase using fully implicit linear SWE solver.',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
@@ -34,7 +34,7 @@ args = parser.parse_known_args()
 args = args[0]
 
 if args.show_args:
-    PETSc.Sys.Print(args)
+    Print(args)
 
 # set up real case
 
@@ -67,11 +67,14 @@ w0 = fd.Function(W).assign(winit)
 wtrial = fd.TrialFunction(W)
 wtest = fd.TestFunction(W)
 
+
 def form_mass(u, h, v, q):
     return swe.linear.form_mass(mesh, u, h, v, q)
 
+
 def form_function(u, h, v, q):
     return swe.linear.form_function(mesh, g, H, f, u, h, v, q)
+
 
 u, h = fd.split(wtrial)
 v, q = fd.split(wtest)
@@ -123,8 +126,8 @@ solver_parameters = {
     'mat_type': 'matfree',
     'ksp_type': 'fgmres',
     'ksp': {
-        #'monitor': None,
-        #'converged_reason': None,
+        # 'monitor': None,
+        # 'converged_reason': None,
         'atol': 1e-0,
         'rtol': 1e-10,
     },
@@ -161,8 +164,6 @@ wc1 = fd.Function(Wc)
 cpx.set_real(wc0, winit)
 cpx.set_imag(wc0, winit)
 
-from math import sin, cos, pi
-
 # complex block
 
 phi = (pi/2)*(args.degs/90)
@@ -190,11 +191,11 @@ Print(f"Complex angle: {args.degs}")
 Print(f"Patch type: {args.patch_type}\n")
 
 for n in range(args.nscales):
-    scale = 1/pow(2,n)
+    scale = 1/pow(2, n)
 
     zr.assign(scale*z.real)
     zi.assign(scale*z.imag)
-    
+
     solver_c.solve()
     complex_its = solver_c.snes.getLinearSolveIterations()
 
