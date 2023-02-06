@@ -15,9 +15,30 @@ import utils.shallow_water.gravity_bumps as case
 
 from sys import exit
 
+import argparse
+parser = argparse.ArgumentParser(
+    description='Complex-valued gravity wave testcase using fully implicit linear SWE solver and shift preconditioning.',
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter
+)
+
+parser.add_argument('--ref_level', type=int, default=3, help='Refinement level of icosahedral grid.')
+parser.add_argument('--dt', type=float, default=1.36, help='Timestep in hours.')
+parser.add_argument('--theta', type=float, default=0.5, help='Parameter for implicit theta-method.')
+parser.add_argument('--filename', type=str, default='gravity_waves', help='Name of output vtk files.')
+parser.add_argument('--degs', type=float, default=45, help='Angle of complex coefficient on mass matrix.')
+parser.add_argument('--shift_degs', type=float, default=45, help='Angle of complex coefficient on mass matrix in shift preconditioner.')
+parser.add_argument('--patch_type', type=str, default='vanka', help='Patch type for multigrid smoother.')
+parser.add_argument('--show_args', action='store_true', default=True, help='Output all the arguments.')
+
+args = parser.parse_known_args()
+args = args[0]
+
+if args.show_args:
+    PETSc.Sys.Print(args)
+
 # set up real case
 
-mesh = swe.create_mg_globe_mesh(ref_level=1, coords_degree=1)
+mesh = swe.create_mg_globe_mesh(ref_level=args.ref_level, coords_degree=1)
 x = fd.SpatialCoordinate(mesh)
 
 W = swe.default_function_space(mesh)
@@ -26,10 +47,10 @@ H = case.H
 g = earth.Gravity
 f = case.coriolis_expression(*x)
 
-dt = 1.36
+dt = args.dt
 dt = dt*units.hour
 
-theta = 0.5
+theta = args.theta
 Theta = fd.Constant(theta)
 
 # coefficient on stiffness matrix is 1
@@ -70,7 +91,7 @@ patch_parameters = {
         'partition_of_unity': True,
         'sub_mat_type': 'seqdense',
         'construct_dim': 0,
-        'construct_type': 'star',
+        'construct_type': args.patch_type,
         'local_type': 'additive',
         'precompute_element_tensors': True,
         'symmetrise_sweep': False
@@ -119,7 +140,7 @@ w1 = fd.Function(W)
 problem = fd.LinearVariationalProblem(A, L, w1)
 solver = fd.LinearVariationalSolver(problem, solver_parameters=solver_parameters)
 
-ofile = fd.File("swe.pvd")
+ofile = fd.File(f"output/{args.filename}.pvd")
 ofile.write(*w0.subfunctions, time=0)
 
 solver.solve()
@@ -140,8 +161,7 @@ from math import sin, cos, pi
 
 # complex block
 
-#phi = deg*(2*pi)/360
-phi = (pi/2)*(60/90)
+phi = (pi/2)*(args.degs/90)
 eta = 0.025
 z = eta*(cos(phi) + sin(phi)*1j)
 
@@ -163,11 +183,9 @@ solver_c = fd.LinearVariationalSolver(problem_c, solver_parameters=solver_parame
 
 solver_c.solve()
 
-exit()
-
 # shift preconditioner
 
-phi_p = (pi/2)*(30/90)
+phi_p = (pi/2)*(args.shift_degs/90)
 eta_p = 1.0*eta
 z_p = eta_p*(cos(phi_p) + sin(phi_p)*1j)
 

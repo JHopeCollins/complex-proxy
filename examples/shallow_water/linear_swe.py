@@ -23,6 +23,7 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument('--ref_level', type=int, default=3, help='Refinement level of icosahedral grid.')
 parser.add_argument('--dt', type=float, default=1.36, help='Timestep in hours.')
+parser.add_argument('--theta', type=float, default=0.5, help='Parameter for implicit theta-method.')
 parser.add_argument('--filename', type=str, default='gravity_waves', help='Name of output vtk files.')
 parser.add_argument('--degs', type=float, default=45, help='Angle of complex coefficient on mass matrix.')
 parser.add_argument('--patch_type', type=str, default='vanka', help='Patch type for multigrid smoother.')
@@ -34,6 +35,7 @@ args = args[0]
 
 if args.show_args:
     PETSc.Sys.Print(args)
+
 # set up real case
 
 mesh = swe.create_mg_globe_mesh(ref_level=args.ref_level, coords_degree=1)
@@ -48,7 +50,7 @@ f = case.coriolis_expression(*x)
 dt = args.dt
 dt = dt*units.hour
 
-theta = 0.5
+theta = args.theta
 Theta = fd.Constant(theta)
 
 # coefficient on stiffness matrix is 1
