@@ -15,6 +15,14 @@ im = Part.Imag
 
 
 def _flatten_tree(root, is_leaf, get_children, container=tuple):
+    """
+    Return the recursively flattened tree below root in the order that the leafs appear in the traversal.
+
+    :arg root: the current root node.
+    :arg is_leaf: predicate on root returning True if root has no children.
+    :arg get_children: unary op on root that returns an iterable of root's children if is_leaf(root) evaluates False.
+    :arg container: the container type to return the flattened tree in.
+    """
     if is_leaf(root):
         return container((root,))
     else:
@@ -23,20 +31,27 @@ def _flatten_tree(root, is_leaf, get_children, container=tuple):
                           for leaf in _flatten_tree(child, is_leaf, get_children)))
 
 
-def _duplicate_elements(orig, dup=2):
+def _duplicate_elements(orig, n=2):
+    """
+    Return an iterable with n*len(orig) elements, where the elements of orig have been duplicated n times.
+
+    :arg orig: the original iterable.
+    :arg n: the number of times to duplicate each element.
+    """
     return type(orig)(dup_elem
                       for elem in orig
-                      for dup_elem in (elem for _ in range(dup)))
+                      for dup_elem in (elem for _ in range(n)))
 
 
 def FiniteElement(elem):
     """
-    Return a UFL FiniteElement which proxies a complex version of the real UFL FiniteElement elem.
+    Return a UFL FiniteElement which proxies a complex version of the real-valued UFL FiniteElement elem.
 
-    The returned complex-valued element has as many components as the real-valued element, but each component has a 'real' and 'imaginary' part eg:
-    Scalar real elements become 2-vector complex elements.
-    n-vector real elements become 2xn-tensor complex elements
-    (shape)-tensor real elements become (2,shape)-tensor complex elements
+    The returned complex-valued element has twice as many components as the real-valued element, with
+    each component of the real-valued element having a corresponding 'real' and 'imaginary' part eg:
+    Non-mixed real elements become 2-component MixedElements.
+    Mixed real elements become MixedElements with 2*len(elem.num_sub_elements()) components.
+    Nested MixedElements are flattened before being proxied.
 
     :arg elem: the UFL FiniteElement to be proxied
     """
@@ -66,6 +81,12 @@ def FunctionSpace(V):
     n-vector components of the real-valued function space become 2xn-tensor components of the complex-valued space.
     (shape)-tensor components of the real-valued function space become (2,shape)-tensor components of the complex-valued space.
 
+    The returned complex-valued function space has twice as many components as the real-valued element, with
+    each component of the real-valued function space having a corresponding 'real' and 'imaginary' part eg:
+    Non-mixed real function spaces become 2-component MixedFunctionSpaces.
+    Mixed real function spaces become MixedFunctionSpaces with 2*len(V.ufl_element().num_sub_elements()) components.
+    Function spaces with nested MixedElements are flattened before being proxied.
+
     :arg V: the real-valued function space.
     """
     return fd.FunctionSpace(V.mesh(), FiniteElement(V.ufl_element()))
@@ -90,7 +111,7 @@ def DirichletBC(W, V, bc):
 
 def _component_elements(us, i):
     """
-    Return a tuple of the real or imaginary elements of the iterable us
+    Return a tuple of the real or imaginary components of the iterable us
 
     :arg us: an iterable having the same number of elements as the complex function space
                 i.e. twice the number of components as the real function space.
@@ -109,34 +130,33 @@ def split(u, i):
         Analogous to firedrake.split(u)
 
     :arg u: a Coefficient or Argument in the complex FunctionSpace
-    :arg i: Part.Real for real subelements, Part.Imag for imaginary elements
+    :arg i: the index of the components, Part.Real for real or Part.Imag for imaginary.
     """
     return _component_elements(fd.split(u), i)
 
 
 def subfunctions(u, i):
     """
-    Return a tuple of the real or imaginary components of the complex function u.
-    Analogous to u.split() (which will be renamed u.subfunctions() at some point).
+    Return a tuple of the real or imaginary components of the complex function u. Analogous to u.subfunctions.
 
     :arg u: a complex Function.
     :arg i: the index of the components, Part.Real for real or Part.Imag for imaginary.
     """
-    return _component_elements(u.split(), i)
+    return _component_elements(u.subfunctions, i)
 
 
 def _get_part(u, vout, i):
     """
-    Get the real or imaginary part of the complex Function u and copy it to real Function vout.
+    Copy the real or imaginary part of the complex Function u into the real-valued Function vout.
 
     :arg u: a complex Function.
-    :arg vout: a real Function.
+    :arg vout: a real-valued Function.
     :arg i: the index of the components, Part.Real for real or Part.Imag for imaginary.
     """
     if not compatible_ufl_elements(u.ufl_element(), vout.ufl_element()):
         raise ValueError("u and vout must be Functions from the complex and real FunctionSpaces")
 
-    for q, p in zip(subfunctions(u, i), vout.split()):
+    for q, p in zip(subfunctions(u, i), vout.subfunctions):
         p.assign(q)
 
     return vout
@@ -153,76 +173,79 @@ def _set_part(u, vnew, i):
     if not compatible_ufl_elements(u.ufl_element(), vnew.ufl_element()):
         raise ValueError("u and vnew must be Functions from the complex and real FunctionSpaces")
 
-    for q, p in zip(subfunctions(u, i), vnew.split()):
+    for q, p in zip(subfunctions(u, i), vnew.subfunctions):
         q.assign(p)
 
 
-def get_real(u, vout, name=None):
+def get_real(u, vout):
     """
-    Return a real Function equal to the real component of the complex Function u.
+    Copy the real component of the complex Function u into the real-valued Function vout
 
     :arg u: a complex Function.
-    :arg vout: If a real Function then real component of u is placed here. NotImplementedError(If None then a new Function is returned.)
-    :arg name: If vout is None, the name of the new Function. Ignored if vout is not none.
+    :arg vout: A real-valued function that real component of u is copied into.
     """
-    if vout is None:
-        raise NotImplementedError("Inferring real FunctionSpace from complex FunctionSpace not implemented yet")
     return _get_part(u, vout, Part.Real)
 
 
 def get_imag(u, vout, name=None):
     """
-    Return a real Function equal to the imaginary component of the complex Function u.
+    Copy the imaginary component of the complex Function u into the real-valued Function vout
 
     :arg u: a complex Function.
-    :arg vout: If a real Function then the imaginary component of u is placed here. NotImplementedError(If None then a new Function is returned.)
-    :arg name: If vout is None, the name of the new Function. Ignored if uout is not none.
+    :arg vout: A real-valued function that imaginary component of u is copied into.
     """
-    if vout is None:
-        raise NotImplementedError("Inferring real FunctionSpace from complex FunctionSpace not implemented yet")
     return _get_part(u, vout, Part.Imag)
 
 
 def set_real(u, vnew):
     """
-    Set the real component of the complex Function u to the value of the real Function vnew.
+    Copy the real-valued Function vnew into the real part of the complex Function u.
 
     :arg u: a complex Function.
-    :arg vnew: A real Function.
+    :arg vnew: A real-value Function.
     """
     _set_part(u, vnew, Part.Real)
 
 
 def set_imag(u, vnew):
     """
-    Set the imaginary component of the complex Function u to the value of the real Function vnew.
+    Copy the real-valued Function vnew into the imaginary part of the complex Function u.
 
     :arg u: a complex Function.
-    :arg vnew: A real Function.
+    :arg vnew: A real-value Function.
     """
     _set_part(u, vnew, Part.Imag)
 
 
-def LinearForm(W, z, f):
+def LinearForm(W, z, f, return_z=False):
     """
     Return a Linear Form on the complex FunctionSpace W equal to a complex multiple of a linear Form on the real FunctionSpace.
     If z = zr + i*zi is a complex number, v = vr + i*vi is a complex TestFunction, we want to construct the Form:
     <zr*vr,f> + i<zi*vi,f>
 
-    :arg W: the complex-proxy FunctionSpace
+    :arg W: the complex-proxy FunctionSpace.
     :arg z: a complex number.
     :arg f: a generator function for a linear Form on the real FunctionSpace, callable as f(*v) where v are TestFunctions on the real FunctionSpace.
+    :arg return_z: If true, return Constants for the real/imaginary parts of z used in the LinearForm.
     """
     v = fd.TestFunction(W)
     vr = split(v, Part.Real)
     vi = split(v, Part.Imag)
 
-    fr = z.real*f(*vr)
-    fi = z.imag*f(*vi)
-    return fr + fi
+    zr = fd.Constant(z.real)
+    zi = fd.Constant(z.imag)
+
+    fr = zr*f(*vr)
+    fi = zi*f(*vi)
+    fc = fr + fi
+
+    if return_z:
+        return fc, zr, zi
+    else:
+        return fc
 
 
-def BilinearForm(W, z, A):
+def BilinearForm(W, z, A, return_z=False):
     """
     Return a bilinear Form on the complex FunctionSpace W equal to a complex multiple of a bilinear Form on the real FunctionSpace.
     If z = zr + i*zi is a complex number, u = ur + i*ui is a complex Function, and b = br + i*bi is a complex linear Form, we want to construct a Form such that (zA)u=b
@@ -237,6 +260,7 @@ def BilinearForm(W, z, A):
     :arg W: the complex-proxy FunctionSpace
     :arg z: a complex number.
     :arg A: a generator function for a bilinear Form on the real FunctionSpace, callable as A(*u, *v) where u and v are TrialFunctions and TestFunctions on the real FunctionSpace.
+    :arg return_z: If true, return Constants for the real/imaginary parts of z used in the BilinearForm.
     """
     u = fd.TrialFunction(W)
     v = fd.TestFunction(W)
@@ -247,14 +271,22 @@ def BilinearForm(W, z, A):
     vr = split(v, Part.Real)
     vi = split(v, Part.Imag)
 
-    A11 = z.real*A(*ur, *vr)
-    A12 = -z.imag*A(*ui, *vr)
-    A21 = z.imag*A(*ur, *vi)
-    A22 = z.real*A(*ui, *vi)
-    return A11 + A12 + A21 + A22
+    zr = fd.Constant(z.real)
+    zi = fd.Constant(z.imag)
+
+    A11 = zr*A(*ur, *vr)
+    A12 = -zi*A(*ui, *vr)
+    A21 = zi*A(*ur, *vi)
+    A22 = zr*A(*ui, *vi)
+    Ac = A11 + A12 + A21 + A22
+
+    if return_z:
+        return Ac, zr, zi
+    else:
+        return Ac
 
 
-def derivative(z, F, u):
+def derivative(z, F, u, return_z=False):
     """
     Return a bilinear Form equivalent to z*J where z is a complex number, J = dF/dw, F is a nonlinear Form on the real-valued space, and w is a function in the real-valued space. The real and imaginary components of the complex function u most both be equal to w for this operation to be valid.
 
@@ -270,6 +302,7 @@ def derivative(z, F, u):
     :arg z: a complex number.
     :arg F: a generator function for a nonlinear Form on the real FunctionSpace, callable as F(*u, *v) where u and v are Functions and TestFunctions on the real FunctionSpace.
     :arg u: the Function to differentiate F with respect to
+    :arg return_z: If true, return Constants for the real/imaginary parts of z used in the BilinearForm.
     """
     W = u.function_space()
     v = fd.TestFunction(W)
@@ -290,9 +323,16 @@ def derivative(z, F, u):
     Jir = fd.derivative(Fir, u)
     Jii = fd.derivative(Fii, u)
 
-    A11 = z.real*Jrr
-    A12 = -z.imag*Jir
-    A21 = z.imag*Jri
-    A22 = z.real*Jii
+    zr = fd.Constant(z.real)
+    zi = fd.Constant(z.imag)
 
-    return A11 + A12 + A21 + A22
+    A11 = zr*Jrr
+    A12 = -zi*Jir
+    A21 = zi*Jri
+    A22 = zr*Jii
+    Ac = A11 + A12 + A21 + A22
+
+    if return_z:
+        return Ac, zr, zi
+    else:
+        return Ac

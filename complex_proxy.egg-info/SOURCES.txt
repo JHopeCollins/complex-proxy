@@ -1,0 +1,7 @@
+LICENSE
+setup.cfg
+setup.py
+complex_proxy.egg-info/PKG-INFO
+complex_proxy.egg-info/SOURCES.txt
+complex_proxy.egg-info/dependency_links.txt
+complex_proxy.egg-info/top_level.txt
