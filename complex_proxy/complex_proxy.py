@@ -137,13 +137,12 @@ def split(u, i):
 
 def subfunctions(u, i):
     """
-    Return a tuple of the real or imaginary components of the complex function u.
-    Analogous to u.split() (which will be renamed u.subfunctions() at some point).
+    Return a tuple of the real or imaginary components of the complex function u. Analogous to u.subfunctions.
 
     :arg u: a complex Function.
     :arg i: the index of the components, Part.Real for real or Part.Imag for imaginary.
     """
-    return _component_elements(u.split(), i)
+    return _component_elements(u.subfunctions, i)
 
 
 def _get_part(u, vout, i):
@@ -157,7 +156,7 @@ def _get_part(u, vout, i):
     if not compatible_ufl_elements(u.ufl_element(), vout.ufl_element()):
         raise ValueError("u and vout must be Functions from the complex and real FunctionSpaces")
 
-    for q, p in zip(subfunctions(u, i), vout.split()):
+    for q, p in zip(subfunctions(u, i), vout.subfunctions):
         p.assign(q)
 
     return vout
@@ -174,7 +173,7 @@ def _set_part(u, vnew, i):
     if not compatible_ufl_elements(u.ufl_element(), vnew.ufl_element()):
         raise ValueError("u and vnew must be Functions from the complex and real FunctionSpaces")
 
-    for q, p in zip(subfunctions(u, i), vnew.split()):
+    for q, p in zip(subfunctions(u, i), vnew.subfunctions):
         q.assign(p)
 
 

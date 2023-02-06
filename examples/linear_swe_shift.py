@@ -17,7 +17,7 @@ from sys import exit
 
 # set up real case
 
-mesh = swe.create_mg_globe_mesh(ref_level=3, coords_degree=1)
+mesh = swe.create_mg_globe_mesh(ref_level=1, coords_degree=1)
 x = fd.SpatialCoordinate(mesh)
 
 W = swe.default_function_space(mesh)
@@ -36,7 +36,7 @@ Theta = fd.Constant(theta)
 Dt_r = fd.Constant(1/(dt*theta))
 
 winit = fd.Function(W)
-uinit, hinit = winit.split()
+uinit, hinit = winit.subfunctions
 
 uinit.project(case.velocity_expression(*x))
 hinit.project(case.depth_expression(*x))
@@ -120,11 +120,11 @@ problem = fd.LinearVariationalProblem(A, L, w1)
 solver = fd.LinearVariationalSolver(problem, solver_parameters=solver_parameters)
 
 ofile = fd.File("swe.pvd")
-ofile.write(*w0.split(), time=0)
+ofile.write(*w0.subfunctions, time=0)
 
 solver.solve()
 w0.assign(w1)
-ofile.write(*w0.split(), time=dt/units.hour)
+ofile.write(*w0.subfunctions, time=dt/units.hour)
 
 # complex problem
 

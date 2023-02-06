@@ -110,15 +110,15 @@ def test_mixed_function_space(mesh, mixed_element):
     V = fd.FunctionSpace(mesh, mixed_element)
     W = cpx.FunctionSpace(V)
 
-    assert len(W.split()) == 2*len(V.split())
+    assert len(W.subfunctions) == 2*len(V.subfunctions)
 
     for i in range(V.ufl_element().num_sub_elements()):
         idx_real = 2*i+0
         idx_imag = 2*i+1
 
-        real_elem = W.split()[idx_real].ufl_element()
-        imag_elem = W.split()[idx_imag].ufl_element()
-        orig_elem = V.split()[i].ufl_element()
+        real_elem = W.subfunctions[idx_real].ufl_element()
+        imag_elem = W.subfunctions[idx_imag].ufl_element()
+        orig_elem = V.subfunctions[i].ufl_element()
 
         assert real_elem == orig_elem
         assert imag_elem == orig_elem
