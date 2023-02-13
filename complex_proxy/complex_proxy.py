@@ -142,7 +142,8 @@ def subfunctions(u, i):
     :arg u: a complex Function.
     :arg i: the index of the components, Part.Real for real or Part.Imag for imaginary.
     """
-    return _component_elements(u.subfunctions, i)
+    usub = u if type(u) is tuple else u.subfunctions
+    return _component_elements(usub, i)
 
 
 def _get_part(u, vout, i):
@@ -153,11 +154,11 @@ def _get_part(u, vout, i):
     :arg vout: a real-valued Function.
     :arg i: the index of the components, Part.Real for real or Part.Imag for imaginary.
     """
-    if not compatible_ufl_elements(u.ufl_element(), vout.ufl_element()):
-        raise ValueError("u and vout must be Functions from the complex and real FunctionSpaces")
+    usub = subfunctions(u, i)
+    vsub = vout if type(vout) is tuple else vout.subfunctions
 
-    for q, p in zip(subfunctions(u, i), vout.subfunctions):
-        p.assign(q)
+    for csub, rsub in zip(usub, vsub):
+        rsub.assign(csub)
 
     return vout
 
@@ -170,11 +171,11 @@ def _set_part(u, vnew, i):
     :arg vnew: a real Function.
     :arg i: the index of the components, Part.Real for real or Part.Imag for imaginary.
     """
-    if not compatible_ufl_elements(u.ufl_element(), vnew.ufl_element()):
-        raise ValueError("u and vnew must be Functions from the complex and real FunctionSpaces")
+    usub = subfunctions(u, i)
+    vsub = vnew if type(vnew) is tuple else vnew.subfunctions
 
-    for q, p in zip(subfunctions(u, i), vnew.subfunctions):
-        q.assign(p)
+    for csub, rsub in zip(usub, vsub):
+        csub.assign(rsub)
 
 
 def get_real(u, vout):

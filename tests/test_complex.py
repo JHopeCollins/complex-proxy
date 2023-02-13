@@ -124,8 +124,9 @@ def test_mixed_function_space(mesh, mixed_element):
         assert imag_elem == orig_elem
 
 
+@pytest.mark.parametrize("split_tuple", [False, True])
 @pytest.mark.parametrize("elem", scalar_elements+vector_elements)
-def test_set_get_part(mesh, elem):
+def test_set_get_part(mesh, elem, split_tuple):
     """
     Test that the real and imaginary parts are set and get correctly from/to real FunctionSpace
 
@@ -152,27 +153,34 @@ def test_set_get_part(mesh, elem):
     ui = fd.Function(V).assign(1)
     w = fd.Function(W).assign(0)
 
+    # test with no tuples, both tuples, and mixed
+    u0s = u0.subfunctions if split_tuple else u0
+    u1s = u1
+    urs = ur.subfunctions if split_tuple else ur
+    uis = ui
+    ws = w.subfunctions if split_tuple else w
+
     # check 0 initialisation
-    cpx.get_real(w, ur)
-    cpx.get_imag(w, ui)
+    cpx.get_real(ws, urs)
+    cpx.get_imag(ws, uis)
 
     assert fd.norm(ur) < eps
     assert fd.norm(ui) < eps
 
     # check real value is set correctly and imag value is unchanged
-    cpx.set_real(w, u0)
+    cpx.set_real(ws, u0s)
 
-    cpx.get_real(w, ur)
-    cpx.get_imag(w, ui)
+    cpx.get_real(ws, urs)
+    cpx.get_imag(ws, uis)
 
     assert fd.errornorm(u0, ur) < eps
     assert fd.norm(ui) < eps
 
     # check imag value is set correctly and real value is unchanged
-    cpx.set_imag(w, u1)
+    cpx.set_imag(ws, u1s)
 
-    cpx.get_real(w, ur)
-    cpx.get_imag(w, ui)
+    cpx.get_real(ws, urs)
+    cpx.get_imag(ws, uis)
 
     assert fd.errornorm(u0, ur) < eps
     assert fd.errornorm(u1, ui) < eps
