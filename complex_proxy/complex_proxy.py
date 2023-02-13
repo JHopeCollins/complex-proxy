@@ -246,10 +246,10 @@ def LinearForm(W, z, f, return_z=False):
         return fc
 
 
-def BilinearForm(W, z, A, return_z=False):
+def _build_matrix(W, z, A, u, return_z=False):
     """
     Return a bilinear Form on the complex FunctionSpace W equal to a complex multiple of a bilinear Form on the real FunctionSpace.
-    If z = zr + i*zi is a complex number, u = ur + i*ui is a complex Function, and b = br + i*bi is a complex linear Form, we want to construct a Form such that (zA)u=b
+    If z = zr + i*zi is a complex number, u = ur + i*ui is a complex (Trial)Function, and b = br + i*bi is a complex linear Form, we want to construct a Form such that (zA)u=b
 
     (zA)u = (zr*A + i*zi*A)(ur + i*ui)
           = (zr*A*ur - zi*A*ui) + i*(zr*A*ui + zi*A*ur)
@@ -261,9 +261,9 @@ def BilinearForm(W, z, A, return_z=False):
     :arg W: the complex-proxy FunctionSpace
     :arg z: a complex number.
     :arg A: a generator function for a bilinear Form on the real FunctionSpace, callable as A(*u, *v) where u and v are TrialFunctions and TestFunctions on the real FunctionSpace.
+    :arg u: a Function or TrialFunction on the complex space
     :arg return_z: If true, return Constants for the real/imaginary parts of z used in the BilinearForm.
     """
-    u = fd.TrialFunction(W)
     v = fd.TestFunction(W)
 
     ur = split(u, Part.Real)
@@ -287,6 +287,26 @@ def BilinearForm(W, z, A, return_z=False):
         return Ac
 
 
+def BilinearForm(W, z, A, return_z=False):
+    """
+    Return a bilinear Form on the complex FunctionSpace W equal to a complex multiple of a bilinear Form on the real FunctionSpace.
+    If z = zr + i*zi is a complex number, u = ur + i*ui is a complex TrialFunction, and b = br + i*bi is a complex linear Form, we want to construct a Form such that (zA)u=b
+
+    (zA)u = (zr*A + i*zi*A)(ur + i*ui)
+          = (zr*A*ur - zi*A*ui) + i*(zr*A*ui + zi*A*ur)
+
+          = | zr*A   -zi*A | | ur | = | br |
+            |              | |    |   |    |
+            | zi*A    zr*A | | ui | = | bi |
+
+    :arg W: the complex-proxy FunctionSpace
+    :arg z: a complex number.
+    :arg A: a generator function for a bilinear Form on the real FunctionSpace, callable as A(*u, *v) where u and v are TrialFunctions and TestFunctions on the real FunctionSpace.
+    :arg return_z: If true, return Constants for the real/imaginary parts of z used in the BilinearForm.
+    """
+    return _build_matrix(W, z, A, fd.TrialFunction(W), return_z)
+
+
 def derivative(z, F, u, return_z=False):
     """
     Return a bilinear Form equivalent to z*J where z is a complex number, J = dF/dw, F is a nonlinear Form on the real-valued space, and w is a function in the real-valued space. The real and imaginary components of the complex function u most both be equal to w for this operation to be valid.
@@ -306,34 +326,11 @@ def derivative(z, F, u, return_z=False):
     :arg return_z: If true, return Constants for the real/imaginary parts of z used in the BilinearForm.
     """
     W = u.function_space()
-    v = fd.TestFunction(W)
+    ncpts = len(u.subfunctions)
 
-    ur = split(u, Part.Real)
-    ui = split(u, Part.Imag)
+    def A(*args):
+        us = args[:ncpts]
+        vs = args[ncpts:]
+        return fd.derivative(F(*us, *vs), u)
 
-    vr = split(v, Part.Real)
-    vi = split(v, Part.Imag)
-
-    Frr = F(*ur, *vr)
-    Fri = F(*ur, *vi)
-    Fir = F(*ui, *vr)
-    Fii = F(*ui, *vi)
-
-    Jrr = fd.derivative(Frr, u)
-    Jri = fd.derivative(Fri, u)
-    Jir = fd.derivative(Fir, u)
-    Jii = fd.derivative(Fii, u)
-
-    zr = fd.Constant(z.real)
-    zi = fd.Constant(z.imag)
-
-    A11 = zr*Jrr
-    A12 = -zi*Jir
-    A21 = zi*Jri
-    A22 = zr*Jii
-    Ac = A11 + A12 + A21 + A22
-
-    if return_z:
-        return Ac, zr, zi
-    else:
-        return Ac
+    return _build_matrix(W, z, A, u, return_z)
