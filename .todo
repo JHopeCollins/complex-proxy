@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<todo version="0.1.20">
+    <note priority="medium" time="1676884010">
+        add test for function_arg argument to DirichletBC
+    </note>
+    <note priority="medium" time="1676884038">
+        add test for extruded meshes with and without boundary conditions
+    </note>
+    <note priority="low" time="1676884075">
+        add tests for tensor elements
+    </note>
+</todo>
