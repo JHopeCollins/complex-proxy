@@ -92,7 +92,7 @@ def FunctionSpace(V):
     return fd.FunctionSpace(V.mesh(), FiniteElement(V.ufl_element()))
 
 
-def DirichletBC(W, V, bc):
+def DirichletBC(W, V, bc, function_arg=None):
     """
     Return a DirichletBC on the complex FunctionSpace W that is equivalent to the DirichletBC bc on the real FunctionSpace V that W was constructed from.
 
@@ -105,7 +105,10 @@ def DirichletBC(W, V, bc):
     else:
         off = 0
 
-    return tuple((fd.DirichletBC(W.sub(off+i), bc.function_arg, bc.sub_domain)
+    if function_arg is None:
+        function_arg = bc.function_arg
+
+    return tuple((fd.DirichletBC(W.sub(off+i), function_arg, bc.sub_domain)
                   for i in range(2)))
 
 
