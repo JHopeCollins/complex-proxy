@@ -328,12 +328,7 @@ def derivative(z, F, u, return_z=False):
     :arg u: the Function to differentiate F with respect to
     :arg return_z: If true, return Constants for the real/imaginary parts of z used in the BilinearForm.
     """
-    W = u.function_space()
-    ncpts = len(u.subfunctions)
-
     def A(*args):
-        us = args[:ncpts]
-        vs = args[ncpts:]
-        return fd.derivative(F(*us, *vs), u)
+        return fd.derivative(F(*args), u)
 
-    return _build_matrix(W, z, A, u, return_z)
+    return _build_matrix(u.function_space(), z, A, u, return_z)
