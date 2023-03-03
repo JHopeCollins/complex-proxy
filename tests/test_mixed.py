@@ -1,6 +1,6 @@
 
 import firedrake as fd
-import complex_proxy as cpx
+import complex_proxy.mixed as cpx
 
 import pytest
 
