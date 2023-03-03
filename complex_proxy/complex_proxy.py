@@ -31,18 +31,6 @@ def _flatten_tree(root, is_leaf, get_children, container=tuple):
                           for leaf in _flatten_tree(child, is_leaf, get_children)))
 
 
-def _duplicate_elements(orig, n=2):
-    """
-    Return an iterable with n*len(orig) elements, where the elements of orig have been duplicated n times.
-
-    :arg orig: the original iterable.
-    :arg n: the number of times to duplicate each element.
-    """
-    return type(orig)(dup_elem
-                      for elem in orig
-                      for dup_elem in (elem for _ in range(n)))
-
-
 def FiniteElement(elem):
     """
     Return a UFL FiniteElement which proxies a complex version of the real-valued UFL FiniteElement elem.
@@ -55,11 +43,11 @@ def FiniteElement(elem):
 
     :arg elem: the UFL FiniteElement to be proxied
     """
-    flat_elem = _flatten_tree(elem,
-                              is_leaf=lambda e: type(e) is not fd.MixedElement,
-                              get_children=lambda e: e.sub_elements())
+    flat_elems = _flatten_tree(elem,
+                               is_leaf=lambda e: type(e) is not fd.MixedElement,
+                               get_children=lambda e: e.sub_elements())
 
-    return fd.MixedElement(_duplicate_elements(flat_elem, 2))
+    return fd.MixedElement([e for ee in zip(flat_elems, flat_elems) for e in ee])
 
 
 def compatible_ufl_elements(elemc, elemr):
