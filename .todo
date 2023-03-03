@@ -6,6 +6,9 @@
     <note priority="medium" time="1676884038">
         add test for extruded meshes with and without boundary conditions
     </note>
+    <note priority="medium" time="1677857729">
+        try fix vector implementation of vector elements by putting them in a 1-component mixed space
+    </note>
     <note priority="low" time="1676884075">
         add tests for tensor elements
     </note>

@@ -1,14 +1,15 @@
 
 import firedrake as fd
 
+from complex_proxy.common import (Part, re, im,
+                                  _flatten_tree,
+                                  _build_oneform, _build_twoform)  # noqa: F401
+
 __all__ = ["FiniteElement", "FunctionSpace", "DirichletBC",
            "split", "subfunctions",
            "get_real", "get_imag", "set_real", "set_imag",
            "LinearForm", "BilinearForm", "derivative",
            "Part", "re", "im"]
-
-from complex_proxy.common import (Part, re, im,
-                                  _flatten_tree)  # noqa: F401
 
 
 def FiniteElement(elem):
@@ -43,11 +44,6 @@ def compatible_ufl_elements(elemc, elemr):
 def FunctionSpace(V):
     """
     Return a FunctionSpace which proxies a complex version of the real FunctionSpace V.
-
-    The returned complex-valued function space has as many components as the real-valued function space, but each component has a 'real' and 'imaginary' part eg:
-    Scalar components of the real-valued function space become 2-vector components of the complex-valued space.
-    n-vector components of the real-valued function space become 2xn-tensor components of the complex-valued space.
-    (shape)-tensor components of the real-valued function space become (2,shape)-tensor components of the complex-valued space.
 
     The returned complex-valued function space has twice as many components as the real-valued element, with
     each component of the real-valued function space having a corresponding 'real' and 'imaginary' part eg:
@@ -90,7 +86,7 @@ def _component_elements(us, i):
     """
     if not isinstance(i, Part):
         raise TypeError("i must be a Part enum")
-    return tuple((us[2*j+i] for j in range(len(us)//2)))
+    return tuple(us[i::2])
 
 
 def split(u, i):
@@ -200,62 +196,7 @@ def LinearForm(W, z, f, return_z=False):
     :arg f: a generator function for a linear Form on the real FunctionSpace, callable as f(*v) where v are TestFunctions on the real FunctionSpace.
     :arg return_z: If true, return Constants for the real/imaginary parts of z used in the LinearForm.
     """
-    v = fd.TestFunction(W)
-    vr = split(v, Part.Real)
-    vi = split(v, Part.Imag)
-
-    zr = fd.Constant(z.real)
-    zi = fd.Constant(z.imag)
-
-    fr = zr*f(*vr)
-    fi = zi*f(*vi)
-    fc = fr + fi
-
-    if return_z:
-        return fc, zr, zi
-    else:
-        return fc
-
-
-def _build_matrix(W, z, A, u, return_z=False):
-    """
-    Return a bilinear Form on the complex FunctionSpace W equal to a complex multiple of a bilinear Form on the real FunctionSpace.
-    If z = zr + i*zi is a complex number, u = ur + i*ui is a complex (Trial)Function, and b = br + i*bi is a complex linear Form, we want to construct a Form such that (zA)u=b
-
-    (zA)u = (zr*A + i*zi*A)(ur + i*ui)
-          = (zr*A*ur - zi*A*ui) + i*(zr*A*ui + zi*A*ur)
-
-          = | zr*A   -zi*A | | ur | = | br |
-            |              | |    |   |    |
-            | zi*A    zr*A | | ui | = | bi |
-
-    :arg W: the complex-proxy FunctionSpace
-    :arg z: a complex number.
-    :arg A: a generator function for a bilinear Form on the real FunctionSpace, callable as A(*u, *v) where u and v are TrialFunctions and TestFunctions on the real FunctionSpace.
-    :arg u: a Function or TrialFunction on the complex space
-    :arg return_z: If true, return Constants for the real/imaginary parts of z used in the BilinearForm.
-    """
-    v = fd.TestFunction(W)
-
-    ur = split(u, Part.Real)
-    ui = split(u, Part.Imag)
-
-    vr = split(v, Part.Real)
-    vi = split(v, Part.Imag)
-
-    zr = fd.Constant(z.real)
-    zi = fd.Constant(z.imag)
-
-    A11 = zr*A(*ur, *vr)
-    A12 = -zi*A(*ui, *vr)
-    A21 = zi*A(*ur, *vi)
-    A22 = zr*A(*ui, *vi)
-    Ac = A11 + A12 + A21 + A22
-
-    if return_z:
-        return Ac, zr, zi
-    else:
-        return Ac
+    return _build_oneform(W, z, f, split, return_z)
 
 
 def BilinearForm(W, z, A, return_z=False):
@@ -275,7 +216,7 @@ def BilinearForm(W, z, A, return_z=False):
     :arg A: a generator function for a bilinear Form on the real FunctionSpace, callable as A(*u, *v) where u and v are TrialFunctions and TestFunctions on the real FunctionSpace.
     :arg return_z: If true, return Constants for the real/imaginary parts of z used in the BilinearForm.
     """
-    return _build_matrix(W, z, A, fd.TrialFunction(W), return_z)
+    return _build_twoform(W, z, A, fd.TrialFunction(W), split, return_z)
 
 
 def derivative(z, F, u, return_z=False):
@@ -299,4 +240,4 @@ def derivative(z, F, u, return_z=False):
     def A(*args):
         return fd.derivative(F(*args), u)
 
-    return _build_matrix(u.function_space(), z, A, u, return_z)
+    return _build_twoform(u.function_space(), z, A, u, split, return_z)
