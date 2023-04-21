@@ -6,6 +6,12 @@ Part = IntEnum("Part", (("Real", 0), ("Imag", 1)))
 re = Part.Real
 im = Part.Imag
 
+api_names = ["FiniteElement", "FunctionSpace", "DirichletBC",
+             "split", "subfunctions",
+             "get_real", "get_imag", "set_real", "set_imag",
+             "LinearForm", "BilinearForm", "derivative",
+             "Part", "re", "im"]
+
 
 def _flatten_tree(root, is_leaf, get_children, container=tuple):
     """

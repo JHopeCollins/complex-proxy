@@ -1,15 +1,11 @@
 
 import firedrake as fd
 
-from complex_proxy.common import (Part, re, im,
+from complex_proxy.common import (Part, re, im, api_names,  # noqa:F401
                                   _flatten_tree,
                                   _build_oneform, _build_twoform)  # noqa: F401
 
-__all__ = ["FiniteElement", "FunctionSpace", "DirichletBC",
-           "split", "subfunctions",
-           "get_real", "get_imag", "set_real", "set_imag",
-           "LinearForm", "BilinearForm", "derivative",
-           "Part", "re", "im"]
+__all__ = api_names
 
 
 def FiniteElement(elem):
